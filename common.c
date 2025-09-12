@@ -267,8 +267,13 @@ int send_raw_packet(
     //NB: send_raw_packet should take a parameter for what mac address it should send to
     uint8_t dest_addr[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02};
 
-    memcpy(frame_hdr.dst_addr, dest_addr);
+    //put the src and dest addresses into the ethernet frame
+    memcpy(frame_hdr.dst_addr, dest_addr, 6);
     memcpy(frame_hdr.src_addr, so_name->sll_addr, 6);
+
+    //set the ethertype of the ethernet frame
+    frame_hdr.eth_proto[0] = 0xFF;
+    frame_hdr.eth_proto[1] = 0xFF;
 
     return rc;
 }
