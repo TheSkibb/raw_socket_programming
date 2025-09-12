@@ -4,6 +4,8 @@
 #include <ifaddrs.h>		/* getifaddrs */
 #include <arpa/inet.h>		/* htons */
 #include <stdint.h>
+#include <linux/if_packet.h>
+#include <sys/socket.h>
 
 #include "common.h"
 
@@ -56,8 +58,10 @@ void get_mac_from_interfaces(struct ifs_data *ifs)
 	freeifaddrs(ifaces);
 }
 
-void init_ifs(struct ifs_data *ifs, int rsock)
-{
+void init_ifs(
+    struct ifs_data *ifs, 
+    int rsock
+){
 	/* Walk through the interface list */
 	get_mac_from_interfaces(ifs);
 
@@ -65,8 +69,7 @@ void init_ifs(struct ifs_data *ifs, int rsock)
 	ifs->rsock = rsock;
 }
 
-int create_raw_socket(void)
-{
+int create_raw_socket(void){
 	//socket descriptor
 	int sd;
 	//change number to the one in the oblig
@@ -82,8 +85,9 @@ int create_raw_socket(void)
 	return sd;
 }
 
-int send_arp_request(struct ifs_data *ifs)
-{
+int send_arp_request(
+    struct ifs_data *ifs
+){
 	struct ether_frame frame_hdr;
 	struct msghdr	*msg;
 	struct iovec	msgvec[1];
@@ -185,9 +189,11 @@ int handle_arp_packet(struct ifs_data *ifs)
 	return rc;
 }
 
-int send_arp_response(struct ifs_data *ifs, struct sockaddr_ll *so_name,
-		      struct ether_frame frame)
-{
+int send_arp_response(
+    struct ifs_data *ifs,
+    struct sockaddr_ll *so_name,
+    struct ether_frame frame
+){
 	struct msghdr *msg;
 	struct iovec msgvec[1];
 	int rc;
@@ -236,4 +242,33 @@ int send_arp_response(struct ifs_data *ifs, struct sockaddr_ll *so_name,
 	free(msg);
 
 	return rc;
+}
+
+/* 
+ * send a raw packet.
+ * NB: MAC address is currently hardcoded
+*/
+int send_raw_packet(
+        int socketfd, 
+        struct sockaddr_ll *so_name, 
+        uint8_t *buf, 
+        size_t len
+){
+    //return code
+    int rc = 0;
+
+    //ethernet frame header
+    struct ether_frame frame_hdr;
+    //message to be sent or received
+    struct msghdr *msg;
+    //iovector
+    struct iovec msgvec[2];
+
+    //NB: send_raw_packet should take a parameter for what mac address it should send to
+    uint8_t dest_addr[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02};
+
+    memcpy(frame_hdr.dst_addr, dest_addr);
+    memcpy(frame_hdr.src_addr, so_name->sll_addr, 6);
+
+    return rc;
 }

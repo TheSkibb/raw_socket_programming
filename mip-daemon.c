@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -6,9 +7,27 @@
 #include <linux/if_packet.h>
 #include "common.h"
 
-int main(){
+int main(int argc, char *argv[]){
 
-    //process args to 
+    //process args to determine mode
+    if(argc <= 1){
+        printf("you need to specify mode sender or receiver\n");
+        return 1;
+    }
+
+    char *arg1 = argv[1];
+
+    printf("%s\n", arg1);
+
+
+    if(strcmp(arg1, "s") == 0){
+        printf("you are sender\n");
+    }else if(strcmp(arg1, "r") == 0){
+        printf("you are receiver\n");
+    }else{
+        printf("invalid mode\n");
+        return 1;
+    }
 
     /* raw socket setup */
     printf("setting up raw socket\n");
