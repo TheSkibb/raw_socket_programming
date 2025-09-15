@@ -73,7 +73,7 @@ int main(int argc, char *argv[]){
 
 
     //et eller annet med å kontrollere at epoll er satt opp riktig
-    if(e}poll_ctl(epollfd, EPOLL_CTL_ADD, raw_sock, &ev) == -1){
+    if(epoll_ctl(epollfd, EPOLL_CTL_ADD, raw_sock, &ev) == -1){
         perror("epoll_ctl: raw_sock");
         close(raw_sock);
         exit(EXIT_FAILURE);
@@ -104,7 +104,7 @@ int main(int argc, char *argv[]){
     printf("mip arp table: ");
     print_mac_addr(ht_get(arp_table, "10"), 6);
 
-
+    
     if(mode == RECEIVE_MODE){
 
         /*check for arp address*/
@@ -151,11 +151,19 @@ int main(int argc, char *argv[]){
             strncpy(message, arg2, max_msg_size);
         }
 
+        uint8_t *buf = create_mip_arp_packet((uint8_t)1, arp_table, (uint8_t)0);
+        if(buf == NULL){
+            printf("buf is null\n");
+            return 1;
+        }
 
         uint8_t dst[] = {0xc6, 0xb6, 0x88, 0xd7, 0xdc, 0xdb};
+
         printf("sending to: ");
         print_mac_addr(dst, 6);
-        send_raw_packet(raw_sock, interfaces.addr, (uint8_t *)message, max_msg_size, dst);
+        send_raw_packet(raw_sock, interfaces.addr, buf, 6, dst);
+        printf("13\n");
+        //send_raw_packet(raw_sock, interfaces.addr, (uint8_t *)message, max_msg_size, dst);
     }
 
     close(raw_sock);

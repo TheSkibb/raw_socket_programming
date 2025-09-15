@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <linux/if_packet.h>
 #include <sys/socket.h>
+#include "arp_table.h"
 
 #include "common.h"
 
@@ -256,6 +257,7 @@ int send_raw_packet(
 ){
     //return code
     int rc = 0;
+    printf("1");
 
     //ethernet frame header
     struct ether_frame frame_hdr;
@@ -267,27 +269,34 @@ int send_raw_packet(
     //put the src and dest addresses into the ethernet frame
     memcpy(frame_hdr.dst_addr, dest_addr, 6);
     memcpy(frame_hdr.src_addr, so_name->sll_addr, 6);
+    printf("2");
 
     //set the ethertype of the ethernet frame
     frame_hdr.eth_proto[0] = 0xFF;
     frame_hdr.eth_proto[1] = 0xFF;
+    printf("3");
 
     //point to frame header
     msgvec[0].iov_base = &frame_hdr;
     msgvec[0].iov_len = sizeof(struct ether_frame);
+    printf("4");
 
     //point to frame payload
     msgvec[1].iov_base = buf;
     msgvec[1].iov_len = len;
+    printf("5");
+
 
     //allocate a zeroed-out message info struct
     msg = (struct msghdr *)calloc(1, sizeof(struct msghdr));
+    printf("6");
 
     /* fill out message metadata */
     msg->msg_name = so_name;
     msg->msg_namelen = sizeof(struct sockaddr_ll);
     msg->msg_iovlen = 2;
     msg->msg_iov = msgvec;
+    printf("7");
 
     //actually send the message to the raw socket file descriptor
     rc = sendmsg(socketfd, msg, 0);
@@ -296,17 +305,53 @@ int send_raw_packet(
         free(msg);
         return 1;
     }
+    printf("8");
 
     free(msg);
 
     return rc;
 }
 
-//does the 
-int send_mip_arp_packet(){
-    return 0;
-}
+//returns a buffer of the mip arp packet, which can be sent with send_raw_packet
+uint8_t *create_mip_arp_packet(
+        uint8_t address, // address we want to look up
+        ht *arp_table, // pointer to the arp_table (not used in this snippet)
+        int type
+) {
+    // Validate the type
+    if (type != 0 && type != 1) {
+        printf("type is wrong\n");
+        return NULL;
+    }
 
+    // Allocate memory for the arp packet, should be 32 bits
+    mip_arp_packet *arp_packet = malloc(sizeof(mip_arp_packet));
+    if (arp_packet == NULL) {
+        printf("cannot allocate memory for arp_packet\n");
+        return NULL;
+    }
+
+    // Fill the arp_packet fields
+    arp_packet->Type = type;
+    arp_packet->Address = address;
+    arp_packet->Reserved = 0;
+
+    // Create a buffer from the arp packet
+    uint8_t *buf = malloc(sizeof(mip_arp_packet));
+    if(buf == NULL){
+        printf("cannot malloc bits for packet buffer\n");
+        free(arp_packet); // Free the allocated arp_packet memory
+        return NULL;
+    }
+
+    // Copy the packet into the buffer
+    memcpy(buf, arp_packet, sizeof(mip_arp_packet));
+
+    // Free arp_packet memory as it's no longer needed
+    free(arp_packet);
+
+    return buf;
+}
 
 int receive_raw_packet(
     int socketfd, 

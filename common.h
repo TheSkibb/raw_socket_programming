@@ -5,6 +5,8 @@
 #include <unistd.h>		/* size_t */
 #include <linux/if_packet.h>	/* struct sockaddr_ll */
 
+#include "arp_table.h"
+
 #define MAX_EVENTS	10
 //we have max 3 nodes in out topology, therefore max_interfaces=3
 #define MAX_IF		3
@@ -72,6 +74,11 @@ int receive_raw_packet(
     size_t len
 );
 int recv_raw_packet(int sd, uint8_t *buf, size_t len);
+uint8_t *create_mip_arp_packet(
+        uint8_t address, //address we want to look up
+        ht *arp_table, //pointer to the arp_table
+        int type
+);
 
 
 #endif /* _COMMON_H */
