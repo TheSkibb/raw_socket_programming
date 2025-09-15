@@ -246,13 +246,13 @@ int send_arp_response(
 
 /* 
  * send a raw packet.
- * NB: MAC address is currently hardcoded
 */
 int send_raw_packet(
-        int socketfd, 
-        struct sockaddr_ll *so_name, 
-        uint8_t *buf, 
-        size_t len
+        int socketfd,                   //socket file descriptor
+        struct sockaddr_ll *so_name,    //socket addr link layer
+        uint8_t *buf,                   //what we are sending, when we construct the mip packet, we can put it into here
+        size_t len,                     //length of what we are sending
+        uint8_t dest_addr[]             //what we are sending to
 ){
     //return code
     int rc = 0;
@@ -264,9 +264,6 @@ int send_raw_packet(
     //iovector
     struct iovec msgvec[2];
 
-    //NB: send_raw_packet should take a parameter for what mac address it should send to
-    uint8_t dest_addr[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02};
-
     //put the src and dest addresses into the ethernet frame
     memcpy(frame_hdr.dst_addr, dest_addr, 6);
     memcpy(frame_hdr.src_addr, so_name->sll_addr, 6);
@@ -275,5 +272,113 @@ int send_raw_packet(
     frame_hdr.eth_proto[0] = 0xFF;
     frame_hdr.eth_proto[1] = 0xFF;
 
+    //point to frame header
+    msgvec[0].iov_base = &frame_hdr;
+    msgvec[0].iov_len = sizeof(struct ether_frame);
+
+    //point to frame payload
+    msgvec[1].iov_base = buf;
+    msgvec[1].iov_len = len;
+
+    //allocate a zeroed-out message info struct
+    msg = (struct msghdr *)calloc(1, sizeof(struct msghdr));
+
+    /* fill out message metadata */
+    msg->msg_name = so_name;
+    msg->msg_namelen = sizeof(struct sockaddr_ll);
+    msg->msg_iovlen = 2;
+    msg->msg_iov = msgvec;
+
+    //actually send the message to the raw socket file descriptor
+    rc = sendmsg(socketfd, msg, 0);
+    if(rc == -1){
+        perror("sendmsg");
+        free(msg);
+        return 1;
+    }
+
+    free(msg);
+
     return rc;
 }
+
+//does the 
+int send_mip_arp_packet(){
+    return 0;
+}
+
+
+int receive_raw_packet(
+    int socketfd, 
+    uint8_t *buf, 
+    size_t len
+){
+
+    struct ether_frame frame_hdr;
+    struct iovec msgvec[2];
+
+    //point to frame header
+    msgvec[0].iov_base = &frame_hdr;
+    msgvec[0].iov_len = sizeof(struct ether_frame);
+
+    //point to frame payload
+    msgvec[1].iov_base = buf;
+    msgvec[1].iov_len = len;
+
+    struct sockaddr_ll so_name;
+    struct msghdr msg;
+
+    //fill out message metadata struct
+    msg.msg_name = &so_name;
+    msg.msg_namelen = sizeof(struct sockaddr_ll);
+    msg.msg_iovlen = 2;
+    msg.msg_iov = msgvec;
+
+    int rc = recvmsg(socketfd, &msg, 0);
+    if(rc == -1) {
+        perror("sendmsg");
+        return -1;
+    }
+
+    //noe memcpy greier her
+
+    return 0;
+}
+
+int recv_raw_packet(int sd, uint8_t *buf, size_t len)
+{
+	struct sockaddr_ll so_name;
+	struct ether_frame frame_hdr;
+	struct msghdr	   msg;
+	struct iovec	   msgvec[2];
+	int    rc;
+
+	/* Point to frame header */
+	msgvec[0].iov_base = &frame_hdr;
+	msgvec[0].iov_len  = sizeof(struct ether_frame);
+	/* Point to frame payload */
+	msgvec[1].iov_base = buf;
+	msgvec[1].iov_len  = len;
+    //printf("recv len %ld", len);
+
+	/* Fill out message metadata struct */
+	msg.msg_name	= &so_name;
+	msg.msg_namelen = sizeof(struct sockaddr_ll);
+	msg.msg_iovlen	= 2;
+	msg.msg_iov	= msgvec;
+
+	rc = recvmsg(sd, &msg, 0);
+	if (rc == -1) {
+		perror("sendmsg");
+		return -1;
+	}
+	/*
+	 * Copy the src_addr of the current frame to the global dst_addr We need
+	 * that address as a dst_addr for the next frames we're going to send
+	 * from the server
+	 */
+	//memcpy(dst_addr, frame_hdr.src_addr, 6);
+
+	return rc;
+}
+

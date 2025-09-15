@@ -26,6 +26,31 @@ struct ifs_data {
 	int ifn;
 };
 
+/* mip arp packet specification
+    +--------+-----------+--------------------+
+    | Type   | Address   | Padding/ Reserved  |
+    +--------+-----------+--------------------+
+    | 1 bit  | 8 bits    | 23 bits of zeroes  |
+    +--------+-----------+--------------------+
+*/
+typedef struct {
+    uint32_t Type : 1;
+    uint32_t Address : 8;
+    uint32_t Reserved : 23;
+} __attribute__((packed)) mip_arp_packet;
+
+
+/* mip packet specification
+     +--------------+-------------+---------+-----------+-----------+
+     | Dest. Addr.  | Src. Addr.  | TTL     | SDU Len.  | SDU type  |
+     +--------------+-------------+---------+-----------+-----------+
+     | 8 bits       | 8 bits      | 4 bits  | 9 bits    | 3 bits    |
+     +--------------+-------------+---------+-----------+-----------+
+*/
+typedef struct {
+    uint32_t dst_addr : 8;
+} __attribute__((packed)) mip_packet;
+
 void get_mac_from_interfaces(struct ifs_data *);
 void print_mac_addr(uint8_t *, size_t);
 void init_ifs(struct ifs_data *, int);
@@ -34,5 +59,19 @@ int send_arp_request(struct ifs_data *);
 int send_arp_response(struct ifs_data *, struct sockaddr_ll *,
 		      struct ether_frame);
 int handle_arp_packet(struct ifs_data *);
+int send_raw_packet(
+        int socketfd, 
+        struct sockaddr_ll *so_name, 
+        uint8_t *buf, 
+        size_t len,
+        uint8_t dest_addr[]
+);
+int receive_raw_packet(
+    int socketfd, 
+    uint8_t *buf, 
+    size_t len
+);
+int recv_raw_packet(int sd, uint8_t *buf, size_t len);
+
 
 #endif /* _COMMON_H */

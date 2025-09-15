@@ -6,10 +6,15 @@
 #include <sys/epoll.h>
 #include <linux/if_packet.h>
 #include "common.h"
+#include "arp_table.h"
+
+#define SEND_MODE 1
+#define RECEIVE_MODE 2
 
 int main(int argc, char *argv[]){
 
-    //process args to determine mode
+    /* determine mode */
+    int mode = 0;
     if(argc <= 1){
         printf("you need to specify mode sender or receiver\n");
         return 1;
@@ -17,13 +22,14 @@ int main(int argc, char *argv[]){
 
     char *arg1 = argv[1];
 
-    printf("%s\n", arg1);
-
-
+    // s = SEND_MODE
+    // r = RECEIVE_MODE
     if(strcmp(arg1, "s") == 0){
         printf("you are sender\n");
+        mode = SEND_MODE;
     }else if(strcmp(arg1, "r") == 0){
         printf("you are receiver\n");
+        mode = RECEIVE_MODE;
     }else{
         printf("invalid mode\n");
         return 1;
@@ -65,8 +71,9 @@ int main(int argc, char *argv[]){
     //add raw socket to epoll to monitor for changes in the file
     ev.data.fd = raw_sock;
 
+
     //et eller annet med å kontrollere at epoll er satt opp riktig
-    if(epoll_ctl(epollfd, EPOLL_CTL_ADD, raw_sock, &ev) == -1){
+    if(e}poll_ctl(epollfd, EPOLL_CTL_ADD, raw_sock, &ev) == -1){
         perror("epoll_ctl: raw_sock");
         close(raw_sock);
         exit(EXIT_FAILURE);
@@ -75,22 +82,80 @@ int main(int argc, char *argv[]){
     //events array to 
     struct epoll_event events[MAX_EVENTS];
 
-    printf("setup complete, entering main loop\n");
+    /* arp table setup */
+    ht *arp_table = ht_create();
+    if(arp_table == NULL){
+        //out of memory
+        return 1;
+    }
 
-    /* main loop */
-    while(1){
-        //wait for chenges in the epollfd descriptor
-        //put events into the events buffer
-        //return maximum MAX_EVENTS events
-        //-1 = infinite timeout
-        int returned_events = epoll_wait(epollfd, events, MAX_EVENTS, -1);
-        if(returned_events == -1){
-            perror("epoll_wait");
-            break;
+    //allocate space to the address
+    int entry_size = 6 * sizeof(uint8_t);
+    int *dst = malloc(entry_size);
+    uint8_t values[]= {0xc6, 0xb6, 0x88, 0xd7, 0xdc, 0xdb};
+    memcpy(dst, values, entry_size);
+
+    //put the address into the table
+    if(ht_set(arp_table, "10", dst) == NULL){
+        return 1;
+    }
+
+    //get the address from the table
+    printf("mip arp table: ");
+    print_mac_addr(ht_get(arp_table, "10"), 6);
+
+
+    if(mode == RECEIVE_MODE){
+
+        /*check for arp address*/
+
+        /* main loop */
+        printf("setup complete, entering main loop\n");
+        while(1){
+            //wait for chenges in the epollfd descriptor
+            //put events into the events buffer
+            //return maximum MAX_EVENTS events
+            //-1 = infinite timeout
+            int returned_events = epoll_wait(epollfd, events, MAX_EVENTS, -1);
+            if(returned_events == -1){
+                perror("epoll_wait");
+                break;
+            }
+            if(events->data.fd == raw_sock){
+
+                int max_buf_size = 1450;
+                uint8_t buf[max_buf_size];
+
+                int rc = recv_raw_packet(raw_sock, buf, max_buf_size);
+
+                printf("you received data: <%s>\n", buf);
+                if(rc < 1){
+                    printf("some error ocurred receiving packet");
+                    perror("recv");
+                    return -1;
+                }
+                //break;
+            }
         }
-        if(events->data.fd == raw_sock){
-            printf("you received data");
+    }else if(mode == SEND_MODE){
+
+        int max_msg_size = 10;
+        char message[max_msg_size];
+
+        if(argc < 3){
+            printf("no message specified, sending \"test\" to:\n");
+            strncpy(message, "test", max_msg_size);
+        }else{
+            char *arg2 = argv[2];
+            printf("sending \"%s\" to:", arg2);
+            strncpy(message, arg2, max_msg_size);
         }
+
+
+        uint8_t dst[] = {0xc6, 0xb6, 0x88, 0xd7, 0xdc, 0xdb};
+        printf("sending to: ");
+        print_mac_addr(dst, 6);
+        send_raw_packet(raw_sock, interfaces.addr, (uint8_t *)message, max_msg_size, dst);
     }
 
     close(raw_sock);
