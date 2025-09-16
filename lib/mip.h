@@ -2,6 +2,7 @@
 #define MIP_H
 
 #include <stdint.h>
+#include <sys/socket.h>
 
 /* mip arp packet specification
     +--------+-----------+--------------------+

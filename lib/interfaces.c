@@ -3,8 +3,9 @@
 #include <ifaddrs.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
-#include "common.h"
+#include "interfaces.h"
 
 /*
  * This function stores struct sockaddr_ll addresses for all interfaces of the
