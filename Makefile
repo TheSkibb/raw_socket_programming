@@ -1,8 +1,9 @@
 CC = gcc
 CFLAGS  = -g -Wall
-MIPD = $(CC) $(CFLAGS) mip-daemon.c common.c arp_table.c -o mipd
-CLIENT = $(CC) $(CFLAGS) client.c common.c -o client
-SERVER = $(CC) $(CFLAGS) server.c common.c -o server
+libs = ./lib/common.c ./lib/arp_table.c ./lib/raw_sockets.c
+MIPD = $(CC) $(CFLAGS) $(libs) mip-daemon.c  -o mipd
+CLIENT = $(CC) $(CFLAGS) $(libs) client.c common.c -o client
+SERVER = $(CC) $(CFLAGS) $(libs) server.c common.c -o server
 
 all:
 	$(CLIENT) 

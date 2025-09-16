@@ -5,13 +5,17 @@
 #include <netinet/in.h>
 #include <sys/epoll.h>
 #include <linux/if_packet.h>
-#include "common.h"
-#include "arp_table.h"
+#include "lib/common.h"
+#include "lib/arp_table.h"
+#include "lib/raw_sockets.h"
 
+//TODO: remove send/recv mode, change for handle
 #define SEND_MODE 1
 #define RECEIVE_MODE 2
 
+/*usage mipd [-h] [-d] <socket_upper> <MIP address>*/
 int main(int argc, char *argv[]){
+    //TODO: do proper flag checking
 
     /* determine mode */
     int mode = 0;
@@ -157,12 +161,12 @@ int main(int argc, char *argv[]){
             return 1;
         }
 
+        //hard-coded addrsss, change for mip arp
         uint8_t dst[] = {0xc6, 0xb6, 0x88, 0xd7, 0xdc, 0xdb};
 
         printf("sending to: ");
         print_mac_addr(dst, 6);
         send_raw_packet(raw_sock, interfaces.addr, buf, 6, dst);
-        printf("13\n");
         //send_raw_packet(raw_sock, interfaces.addr, (uint8_t *)message, max_msg_size, dst);
     }
 
