@@ -8,10 +8,11 @@
 
 #define ETH_BROADCAST	{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
 
-struct ether_frame {
-	uint8_t dst_addr[6];
-	uint8_t src_addr[6];
-	uint8_t eth_proto[2];
+//ethernet header
+struct eth_hdr {
+	uint8_t  dst_mac[6];
+	uint8_t  src_mac[6];
+	uint16_t ethertype;
 } __attribute__((packed));
 
 //we have max 3 nodes in out topology, therefore max_interfaces=3

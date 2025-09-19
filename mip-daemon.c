@@ -1,47 +1,77 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdarg.h>
+#include <sys/epoll.h>
 
 #include "lib/raw_sockets.h"
 #include "lib/interfaces.h"
+#include "lib/mip.h"
 
 //TODO: remove send/recv mode, change for handle
-#define SEND_MODE 1
-#define RECEIVE_MODE 2
 
-/*usage mipd [-h] [-d] <socket_upper> <MIP address>*/
+int printhelp(){
+    printf("usage mipd [-h] [-d] <socket_upper> <MIP address>\n");
+    return 0;
+}
+
+int debug = 0;
+
+int debugprint(const char *format, ...) {
+    if (debug) {
+        va_list args;
+        va_start(args, format);
+        vprintf(format, args);
+        va_end(args);
+        printf("\n");
+    }
+    return 0;
+}
+
 int main(int argc, char *argv[]){
     //TODO: do proper flag checking
 
     /* determine mode */
-    int mode = 0;
     if(argc <= 1){
-        printf("you need to specify mode sender or receiver\n");
+        printf("you need to supply at least one argument, see usage with -h\n");
         return 1;
     }
 
-    char *arg1 = argv[1];
+    int send = 0;
 
-    // s = SEND_MODE
-    // r = RECEIVE_MODE
-    if(strcmp(arg1, "s") == 0){
-        printf("you are sender\n");
-        mode = SEND_MODE;
-    }else if(strcmp(arg1, "r") == 0){
-        printf("you are receiver\n");
-        mode = RECEIVE_MODE;
-    }else{
-        printf("invalid mode\n");
-        return 1;
+    char *arg;
+
+    for(int i = 1; i < argc; i++){
+
+
+        arg = argv[i];
+        printf("arg%d: %s\n", i, arg);
+        // s = SEND_MODE
+        // r = RECEIVE_MODE
+        if(strcmp(arg, "-h") == 0){
+            printhelp();
+            return 0;
+        }else if(strcmp(arg, "-d") == 0){
+            debug = 1;
+            debugprint("you have started the daemon with debug prints");
+        }else if(strcmp(arg, "s") == 0){
+            debugprint("send mode");
+            send = 1;
+        }else if(strcmp(arg, "r") == 0){
+            debugprint("recvmode");
+            send = 0;
+        }else{
+            debugprint("starting a unix socket with %s", arg);
+            //return 1;
+        }
     }
 
     /* raw socket setup */
-    printf("setting up raw socket\n");
+    debugprint("setting up raw socket");
     int raw_sock = create_raw_socket();
-    printf("socket: %d", raw_sock);
 
     /* interface setup */
-    printf("setting up interfaces\n");
+    debugprint("setting up interfacesn");
     struct ifs_data interfaces;
     init_ifs(&interfaces, raw_sock);
 
@@ -49,6 +79,55 @@ int main(int argc, char *argv[]){
     //A and C should have 1, B should have 2
     for(int i = 0; i < interfaces.ifn; i++){
         print_mac_addr(interfaces.addr[i].sll_addr, 6);
+    }
+
+    /* epoll */
+    struct epoll_event ev;
+
+	/* Create epoll table */
+	int epollfd = epoll_create1(0);
+	if (epollfd == -1) {
+		perror("epoll_create1");
+		return 0;
+	}
+
+	/* Add RAW socket to epoll table */
+	ev.events = EPOLLIN;
+	ev.data.fd = raw_sock;
+	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, raw_sock, &ev) == -1) {
+		perror("epoll_ctl: raw_sock");
+		return 0;
+	}
+
+    struct epoll_event events[10];
+    int rc = 0;
+
+    if(send){
+        uint8_t broadcast[] = ETH_BROADCAST;
+        debugprint("ready to send broadcast message %s", argv[argc-1]);
+        rc = send_mip_packet(&interfaces, interfaces.addr[1].sll_addr, broadcast, 0x01, 0x02, argv[argc-1]);
+        if(rc < 0){
+            perror("send_mip_packet");
+            return 0;
+        }
+        debugprint("message sent");
+    }
+
+    debugprint("ready to receive message");
+
+    while(1){
+        rc = epoll_wait(epollfd, events, 10, -1);
+        if(rc == -1) {
+            perror("epoll_wait");
+            return 0;
+        }else if(events->data.fd == raw_sock){
+            printf("received a PDU");
+            rc = handle_mip_packet(&interfaces);
+            if(rc < 0){
+                perror("handle_mip_packet");
+                return 0;
+            }
+        }
     }
 
     close(raw_sock);

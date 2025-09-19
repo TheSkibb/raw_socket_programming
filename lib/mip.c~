@@ -1,0 +1,74 @@
+#include <linux/if_packet.h>
+#include <sys/socket.h>
+#include <stdio.h>
+#include <asm-generic/errno-base.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#include "interfaces.h"
+#include "mip.h"
+
+struct hello_header {
+	uint8_t dest;
+	uint8_t src;
+	uint8_t sdu_len : 4;
+} __attribute__((packed));
+
+struct pdu *alloc_pdu(void){
+    struct pdu *pdu = (struct pdu *)malloc(sizeof(struct pdu));
+
+    pdu->ethhdr = (struct eth_hdr *)malloc(sizeof(struct eth_hdr));
+    //TODO: maybe change for MIP type
+    pdu->ethhdr->ethertype = htons(0xFFFF); 
+
+    pdu->mip_hdr = (struct mip_hdr *)malloc(sizeof(struct mip_hdr));
+
+
+    return pdu;
+
+}
+
+int handle_mip_packet(
+        struct ifs_data *ifs
+    ){
+
+    struct pdu *pdu = (struct pdu *)malloc(sizeof(struct pdu));
+    if(NULL){
+        perror("malloc");
+        return -ENOMEM;
+    }
+
+    uint8_t rcv_buf[MAX_BUF_SIZE];
+
+    /*receive from the serialized buffer */
+    if(recvfrom(
+        ifs->rsock, 
+        rcv_buf, 
+        MAX_BUF_SIZE, 
+        0, 
+        NULL, 
+        NULL) <= 0
+    ){
+        perror("recvfrom()");
+        close(ifs->rsock);
+    }
+
+    size_t rcv_len = 1024; //mip_deserialize_pdu(pdu, rcv_buf);
+
+    printf("received a PDU");
+    //TODO: handle what kind of mip packet it is
+
+    return 0;
+}
+
+int send_mip_packet(
+    struct ifs_data *ifs,
+    uint8_t *src_mac_addr,
+    uint8_t *dst_mac_addr,
+    uint8_t src_hip_addr,
+    uint8_t dst_hip_addr,
+    const char *sdu
+){
+    return 0;
+}
