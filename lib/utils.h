@@ -1,0 +1,13 @@
+#ifndef UTILS_H
+#define UTILS_H
+
+//prints if global debug flag is set
+//takes in format string and arguments
+//NOTICE: adds \n to end of string
+int debugprint(const char *format, ...);
+//sets the global debug flag
+void set_debug(int mode);
+//returns the global debug flag
+int get_debug();
+
+#endif

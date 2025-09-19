@@ -6,8 +6,11 @@
 
 #include "interfaces.h"
 
-#define MIP_TYPE_ARP_REQUEST 0x0
-#define MIP_TYPE_ARP_RESPONSE 0x1
+#define MIP_TYPE_ARP 0x01
+#define MIP_TYPE_PING 0x02
+
+#define MIP_ARP_TYPE_REQUEST 0x0
+#define MIP_ARP_TYPE_RESPONSE 0x1
 
 /* mip arp packet specification
     +--------+-----------+--------------------+
@@ -71,6 +74,13 @@ int handle_mip_packet(
 int send_mip_arp_request(
     struct ifs_data *ifs,
     uint8_t *src_mac_addr,
+    uint8_t src_mip_addr,
+    uint8_t dst_mip_addr
+);
+int send_mip_arp_response(
+    struct ifs_data *ifs,
+    uint8_t *src_mac_addr,
+    uint8_t *dst_mac_addr,
     uint8_t src_mip_addr,
     uint8_t dst_mip_addr
 );

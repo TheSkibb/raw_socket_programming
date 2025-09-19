@@ -9,6 +9,7 @@
 
 #include "interfaces.h"
 #include "mip.h"
+#include "utils.h"
 
 struct hello_header {
 	uint8_t dest;
@@ -19,8 +20,15 @@ struct hello_header {
 void print_mip_arp_header(
     struct mip_arp_hdr *miparphdr
 ){
+    if(get_debug() != 1){
+        return;
+    }
     printf("--------MIP ARP------\n");
-    printf("type: %d\n", miparphdr->Type);
+    if(miparphdr->Type == MIP_ARP_TYPE_REQUEST){
+        printf("type: Request = %d\n", miparphdr->Type);
+    }else if(miparphdr->Type == MIP_ARP_TYPE_RESPONSE){
+        printf("type: Response = %d\n", miparphdr->Type);
+    }
     printf("Address: %d\n", miparphdr->Address);
     printf("---------------------\n");
 }
@@ -70,19 +78,19 @@ int handle_mip_packet(
 
     //check if packet is mip arp
     if(miphdr.dst_addr == 0xFF){
-        printf("type is MIP arp\n");
+        debugprint("type is MIP arp");
         struct mip_arp_hdr *miparphdr = (struct mip_arp_hdr *)&packet;
-        print_mip_arp_header(miparphdr);
 
-        printf("TYPEINFO:");
-        if(miparphdr->Type == 1){
-            printf("type is 1\n");
-        } else if(miparphdr->Type == 0){
-            printf("type is 0\n");
+        if(miparphdr->Type == MIP_ARP_TYPE_REQUEST){
+            debugprint("received MIP ARP request: ");
+            send_mip_arp_response(ifs, ethhdr.dst_mac, ethhdr.src_mac, miphdr.dst_addr, miphdr.dst_addr);
+        } else if(miparphdr->Type == MIP_ARP_TYPE_RESPONSE){
+            debugprint("received MIP ARP response: ");
         } else {
-            printf("mip arp type invalid\n");
+            debugprint("mip arp type invalid");
             return -1;
         }
+        print_mip_arp_header(miparphdr);
     }
 
 
@@ -124,7 +132,7 @@ int send_mip_packet(
     miphdr.sdu_len = (sizeof(sdu)+3)/4;
     miphdr.sdu_type = 0;
 
-    printf("sdu size: %lu, sdu_len: %d\n", sizeof(sdu), miphdr.sdu_len);
+    debugprint("sdu size: %lu, sdu_len: %d", sizeof(sdu), miphdr.sdu_len);
 
     //point to mip header
     msgvec[1].iov_base = &miphdr;
@@ -152,7 +160,6 @@ int send_mip_packet(
     }
     
     print_mac_addr(ethhdr.dst_mac, 6);
-    printf("\n");
 
     free(msg);
 
@@ -203,7 +210,7 @@ int send_mip_arp_response(
 
     struct mip_arp_hdr arphdr;
 
-    arphdr.Type = 0;
+    arphdr.Type = 1;
     arphdr.Address = dst_mip_addr;
 
     int rc = send_mip_packet(

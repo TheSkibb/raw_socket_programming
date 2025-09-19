@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdarg.h>
 #include <sys/epoll.h>
 
 #include "lib/raw_sockets.h"
 #include "lib/interfaces.h"
 #include "lib/mip.h"
+#include "lib/utils.h"
 
 //TODO: remove send/recv mode, change for handle
 
@@ -37,19 +37,6 @@ int epoll_add_sock(int sd)
 	return epollfd;
 }
 
-int debug = 0;
-
-int debugprint(const char *format, ...) {
-    if (debug) {
-        va_list args;
-        va_start(args, format);
-        vprintf(format, args);
-        va_end(args);
-        printf("\n");
-    }
-    return 0;
-}
-
 int main(int argc, char *argv[]){
     //TODO: do proper flag checking
 
@@ -60,29 +47,25 @@ int main(int argc, char *argv[]){
     }
 
     int send = 0;
-
     char *arg;
 
+    //parse cmdline arguments
+    //TODO: add mip address (i think, maybe in client and server instead)
     for(int i = 1; i < argc; i++){
-
-
         arg = argv[i];
-        printf("arg%d: %s\n", i, arg);
-        // s = SEND_MODE
-        // r = RECEIVE_MODE
-        if(strcmp(arg, "-h") == 0){
+        if(strcmp(arg, "-h") == 0){ //print help
             printhelp();
             return 0;
-        }else if(strcmp(arg, "-d") == 0){
-            debug = 1;
+        }else if(strcmp(arg, "-d") == 0){ //enable debug prints
+            set_debug(1);
             debugprint("you have started the daemon with debug prints");
-        }else if(strcmp(arg, "s") == 0){
+        }else if(strcmp(arg, "s") == 0){ //send mode TODO: remove, everything should be one mode
             debugprint("send mode");
             send = 1;
-        }else if(strcmp(arg, "r") == 0){
+        }else if(strcmp(arg, "r") == 0){ //receiver mode TODO
             debugprint("recvmode");
             send = 0;
-        }else{
+        }else{ // name of unix socket
             debugprint("starting a unix socket with %s", arg);
             //return 1;
         }
@@ -136,7 +119,7 @@ int main(int argc, char *argv[]){
 			perror("epoll_wait");
 			return 0;
 		} else if (events->data.fd == raw_sock) {
-            printf("you received a packet\n");
+            debugprint("you received a packet");
             rc = handle_mip_packet(&interfaces);
             if(rc <= 0){
                 debugprint("rc == %d", rc);

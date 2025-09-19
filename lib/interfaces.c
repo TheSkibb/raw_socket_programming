@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "interfaces.h"
+#include "utils.h"
 
 /*
  * This function stores struct sockaddr_ll addresses for all interfaces of the
@@ -59,6 +60,10 @@ void init_ifs(
  */
 void print_mac_addr(uint8_t *addr, size_t len)
 {
+    //get debug returns 0 or 1
+    if(get_debug() != 1){
+        return ;
+    }
 	size_t i;
 
 	for (i = 0; i < len - 1; i++) {
