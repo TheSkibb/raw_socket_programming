@@ -15,6 +15,28 @@ int printhelp(){
     return 0;
 }
 
+int epoll_add_sock(int sd)
+{
+	struct epoll_event ev;
+
+	/* Create epoll table */
+	int epollfd = epoll_create1(0);
+	if (epollfd == -1) {
+		perror("epoll_create1");
+		return 1;
+	}
+
+	/* Add RAW socket to epoll table */
+	ev.events = EPOLLIN;
+	ev.data.fd = sd;
+	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sd, &ev) == -1) {
+		perror("epoll_ctl: raw_sock");
+		return 1;
+	}
+
+	return epollfd;
+}
+
 int debug = 0;
 
 int debugprint(const char *format, ...) {
@@ -71,7 +93,7 @@ int main(int argc, char *argv[]){
     int raw_sock = create_raw_socket();
 
     /* interface setup */
-    debugprint("setting up interfacesn");
+    debugprint("setting up interfaces");
     struct ifs_data interfaces;
     init_ifs(&interfaces, raw_sock);
 
@@ -81,25 +103,6 @@ int main(int argc, char *argv[]){
         print_mac_addr(interfaces.addr[i].sll_addr, 6);
     }
 
-    /* epoll */
-    struct epoll_event ev;
-
-	/* Create epoll table */
-	int epollfd = epoll_create1(0);
-	if (epollfd == -1) {
-		perror("epoll_create1");
-		return 0;
-	}
-
-	/* Add RAW socket to epoll table */
-	ev.events = EPOLLIN;
-	ev.data.fd = raw_sock;
-	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, raw_sock, &ev) == -1) {
-		perror("epoll_ctl: raw_sock");
-		return 0;
-	}
-
-    struct epoll_event events[10];
     int rc = 0;
 
     if(send){
@@ -115,20 +118,30 @@ int main(int argc, char *argv[]){
 
     debugprint("ready to receive message");
 
-    while(1){
-        rc = epoll_wait(epollfd, events, 10, -1);
-        if(rc == -1) {
-            perror("epoll_wait");
-            return 0;
-        }else if(events->data.fd == raw_sock){
-            printf("received a PDU");
+    int efd;
+    int epoll_max_events = 10;
+    struct epoll_event events[epoll_max_events];
+
+    efd = epoll_add_sock(raw_sock);
+
+
+    while(1) {
+		rc = epoll_wait(efd, events, epoll_max_events, -1);
+		if (rc == -1) {
+			perror("epoll_wait");
+			return 0;
+		} else if (events->data.fd == raw_sock) {
+            printf("you received a packet\n");
             rc = handle_mip_packet(&interfaces);
-            if(rc < 0){
+            if(rc <= 0){
+                debugprint("rc == %d", rc);
                 perror("handle_mip_packet");
-                return 0;
+                return 1;
             }
-        }
-    }
+		}
+	}
+	close(raw_sock);
+
 
     close(raw_sock);
     return 0; //success
