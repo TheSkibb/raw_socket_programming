@@ -16,6 +16,15 @@ struct hello_header {
 	uint8_t sdu_len : 4;
 } __attribute__((packed));
 
+void print_mip_arp_header(
+    struct mip_arp_hdr *miparphdr
+){
+    printf("--------MIP ARP------\n");
+    printf("type: %d\n", miparphdr->Type);
+    printf("Address: %d\n", miparphdr->Address);
+    printf("---------------------\n");
+}
+
 int handle_mip_packet(
         struct ifs_data *ifs
     ){
@@ -59,14 +68,23 @@ int handle_mip_packet(
         return -1;
     }
 
-    printf("we got a packet for address: %d, with content %s\n", 
-            miphdr.dst_addr, 
-            (char *)packet);
+    //check if packet is mip arp
+    if(miphdr.dst_addr == 0xFF){
+        printf("type is MIP arp\n");
+        struct mip_arp_hdr *miparphdr = (struct mip_arp_hdr *)&packet;
+        print_mip_arp_header(miparphdr);
 
-    if(strcmp("ping", (char *)packet) == 0){
-        uint8_t broadcast[] = ETH_BROADCAST;
-        rc = send_mip_packet(ifs, ifs->addr[0].sll_addr, broadcast, 0x01, 0x02, "pong");
+        printf("TYPEINFO:");
+        if(miparphdr->Type == 1){
+            printf("type is 1\n");
+        } else if(miparphdr->Type == 0){
+            printf("type is 0\n");
+        } else {
+            printf("mip arp type invalid\n");
+            return -1;
+        }
     }
+
 
     return rc;
 }
@@ -77,7 +95,7 @@ int send_mip_packet(
     uint8_t *dst_mac_addr,
     uint8_t src_mip_addr,
     uint8_t dst_mip_addr,
-    const char *sdu
+    uint8_t *sdu
 ){
     struct eth_hdr ethhdr;
     struct mip_hdr miphdr;
@@ -102,13 +120,18 @@ int send_mip_packet(
     //fill in mip hdr
     miphdr.dst_addr = dst_mip_addr;
     miphdr.src_addr = src_mip_addr;
+    miphdr.ttl = 1;
+    miphdr.sdu_len = (sizeof(sdu)+3)/4;
+    miphdr.sdu_type = 0;
+
+    printf("sdu size: %lu, sdu_len: %d\n", sizeof(sdu), miphdr.sdu_len);
 
     //point to mip header
     msgvec[1].iov_base = &miphdr;
     msgvec[1].iov_len = sizeof(struct mip_hdr);
 
     //point to sdu
-    msgvec[2].iov_base = (uint8_t *)sdu;
+    msgvec[2].iov_base = sdu;
     msgvec[2].iov_len = sizeof(sdu);
 
     //allocate a zeroed out message info struct
@@ -136,3 +159,61 @@ int send_mip_packet(
     return rc;
 }
 
+int send_mip_arp_request(
+    struct ifs_data *ifs,
+    uint8_t *src_mac_addr,
+    uint8_t src_mip_addr,
+    uint8_t dst_mip_addr
+){
+    //check if you are looking for your own address
+    if(src_mip_addr == dst_mip_addr){
+        return -1;
+    }
+
+    uint8_t eth_broadcast[] = ETH_BROADCAST;
+    uint8_t mip_broadcast = 0xFF;
+
+    struct mip_arp_hdr arphdr;
+
+    arphdr.Type = 0;
+    arphdr.Address = dst_mip_addr;
+
+    int rc = send_mip_packet(
+        ifs,
+        src_mac_addr,
+        eth_broadcast,
+        src_mip_addr,
+        mip_broadcast,
+        (uint8_t *)&arphdr
+    );
+
+    return rc;
+}
+
+int send_mip_arp_response(
+    struct ifs_data *ifs,
+    uint8_t *src_mac_addr,
+    uint8_t *dst_mac_addr,
+    uint8_t src_mip_addr,
+    uint8_t dst_mip_addr
+    ){
+
+    uint8_t eth_broadcast[] = ETH_BROADCAST;
+    uint8_t mip_broadcast = 0xFF;
+
+    struct mip_arp_hdr arphdr;
+
+    arphdr.Type = 0;
+    arphdr.Address = dst_mip_addr;
+
+    int rc = send_mip_packet(
+        ifs,
+        src_mac_addr,
+        eth_broadcast,
+        src_mip_addr,
+        mip_broadcast,
+        (uint8_t *)&arphdr
+    );
+
+    return rc;
+}

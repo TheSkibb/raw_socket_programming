@@ -6,6 +6,9 @@
 
 #include "interfaces.h"
 
+#define MIP_TYPE_ARP_REQUEST 0x0
+#define MIP_TYPE_ARP_RESPONSE 0x1
+
 /* mip arp packet specification
     +--------+-----------+--------------------+
     | Type   | Address   | Padding/ Reserved  |
@@ -13,11 +16,11 @@
     | 1 bit  | 8 bits    | 23 bits of zeroes  |
     +--------+-----------+--------------------+
 */
-typedef struct {
+struct mip_arp_hdr{
     uint32_t Type : 1;
     uint32_t Address : 8;
     uint32_t Reserved : 23;
-} __attribute__((packed)) mip_arp_packet;
+} __attribute__((packed));
 
 //TODO: change out for actual max buffer size, calculated from sdu length
 #define MAX_BUF_SIZE 1024
@@ -60,10 +63,16 @@ int send_mip_packet(
     uint8_t src_hip_addr,
     //mip address of recipient
     uint8_t dst_hip_addr,
-    const char *sdu
+    uint8_t *sdu
 );
 int handle_mip_packet(
         struct ifs_data *ifs
+);
+int send_mip_arp_request(
+    struct ifs_data *ifs,
+    uint8_t *src_mac_addr,
+    uint8_t src_mip_addr,
+    uint8_t dst_mip_addr
 );
 
 #endif

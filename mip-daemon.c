@@ -106,9 +106,14 @@ int main(int argc, char *argv[]){
     int rc = 0;
 
     if(send){
-        uint8_t broadcast[] = ETH_BROADCAST;
-        debugprint("ready to send broadcast message %s", argv[argc-1]);
-        rc = send_mip_packet(&interfaces, interfaces.addr[1].sll_addr, broadcast, 0x01, 0x02, argv[argc-1]);
+        //uint8_t broadcast[] = ETH_BROADCAST;
+        //rc = send_mip_packet(&interfaces, interfaces.addr[1].sll_addr, broadcast, 0x01, 0x02, (uint8_t *)argv[argc-1]);
+        rc = send_mip_arp_request(
+                &interfaces, 
+                interfaces.addr[1].sll_addr, 
+                0x01, 
+                0x02
+        );
         if(rc < 0){
             perror("send_mip_packet");
             return 0;
