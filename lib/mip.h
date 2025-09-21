@@ -66,6 +66,7 @@ int send_mip_packet(
     uint8_t src_hip_addr,
     //mip address of recipient
     uint8_t dst_hip_addr,
+    //service data unit (the actual data we are sending)
     uint8_t *sdu
 );
 int handle_mip_packet(

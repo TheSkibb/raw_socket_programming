@@ -76,8 +76,8 @@ int handle_mip_packet(
         return -1;
     }
 
-    //check if packet is mip arp
-    if(miphdr.dst_addr == 0xFF){
+    //mip arp handling
+    if(miphdr.sdu_type == MIP_TYPE_ARP &&  miphdr.dst_addr == 0xFF){
         debugprint("type is MIP arp");
         struct mip_arp_hdr *miparphdr = (struct mip_arp_hdr *)&packet;
 
@@ -93,6 +93,12 @@ int handle_mip_packet(
         print_mip_arp_header(miparphdr);
     }
 
+    //send up to unix socket
+    if(miphdr.sdu_type == MIP_TYPE_PING){
+        debugprint("received a PING message");
+    }
+
+
 
     return rc;
 }
@@ -107,7 +113,6 @@ int send_mip_packet(
 ){
     struct eth_hdr ethhdr;
     struct mip_hdr miphdr;
-    //TODO: send buf
     struct msghdr *msg;
 
     int iov_len = 3;
@@ -132,7 +137,7 @@ int send_mip_packet(
     miphdr.sdu_len = (sizeof(sdu)+3)/4;
     miphdr.sdu_type = 0;
 
-    debugprint("sdu size: %lu, sdu_len: %d", sizeof(sdu), miphdr.sdu_len);
+    debugprint("sending SDU with number of bytes: %lu, and sdu_len: %d", sizeof(sdu), miphdr.sdu_len);
 
     //point to mip header
     msgvec[1].iov_base = &miphdr;

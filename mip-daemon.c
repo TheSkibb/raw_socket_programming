@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <sys/epoll.h>
 
-#include "lib/raw_sockets.h"
+#include "lib/sockets.h"
 #include "lib/interfaces.h"
 #include "lib/mip.h"
 #include "lib/utils.h"
@@ -41,8 +41,8 @@ int main(int argc, char *argv[]){
     //TODO: do proper flag checking
 
     /* determine mode */
-    if(argc <= 1){
-        printf("you need to supply at least one argument, see usage with -h\n");
+    if(argc <= 2){
+        printf("arguments supplied, see usage with -h\n");
         return 1;
     }
 
@@ -113,12 +113,13 @@ int main(int argc, char *argv[]){
     efd = epoll_add_sock(raw_sock);
 
 
+    //wait for messages
     while(1) {
 		rc = epoll_wait(efd, events, epoll_max_events, -1);
 		if (rc == -1) {
 			perror("epoll_wait");
 			return 0;
-		} else if (events->data.fd == raw_sock) {
+		} /* else if (events->data.fd == raw_sock) {
             debugprint("you received a packet");
             rc = handle_mip_packet(&interfaces);
             if(rc <= 0){
@@ -127,6 +128,7 @@ int main(int argc, char *argv[]){
                 return 1;
             }
 		}
+        */
 	}
 	close(raw_sock);
 

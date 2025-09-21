@@ -2,3 +2,5 @@ server
 client
 mipd
 a.out
+ping_server
+ping_client
