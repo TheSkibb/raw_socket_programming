@@ -21,7 +21,8 @@ int main(int argc, char *argv[]){
 
    int data_socket = create_unix_socket(SOCKET_NAME, UNIX_SOCKET_MODE_CLIENT);
 
-   /* Send arguments. */
+   /*
+   // Send arguments. 
    for (int i = 1; i < argc; ++i) {
        printf("sending argument: \"%s\"\n", argv[i]);
        w = write(data_socket, argv[i], strlen(argv[i]) + 1);
@@ -30,19 +31,35 @@ int main(int argc, char *argv[]){
            break;
        }
    }
+   */
 
-   /* Receive result. */
+
+   w = write(data_socket, "connected", strlen("connected") + 1);
+   if (w == -1) {
+       perror("write");
+       return 0;
+   }
+
+   // Receive result. 
    r = read(data_socket, buffer, sizeof(buffer));
    if (r == -1) {
        perror("read");
        exit(EXIT_FAILURE);
    }
 
-   /* Ensure buffer is 0-terminated. */
+   // Ensure buffer is 0-terminated. 
 
    buffer[sizeof(buffer) - 1] = 0;
 
    printf("Result = %s\n", buffer);
+
+   printf("ready to receive data\n");
+   // Receive result. 
+   r = read(data_socket, buffer, sizeof(buffer));
+   if (r == -1) {
+       perror("read");
+       exit(EXIT_FAILURE);
+   }
 
    /* Close socket. */
 

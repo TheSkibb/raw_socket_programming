@@ -112,7 +112,6 @@ int main(int argc, char *argv[]){
 
     efd = epoll_add_sock(raw_sock);
 
-
     //wait for messages
     while(1) {
 		rc = epoll_wait(efd, events, epoll_max_events, -1);

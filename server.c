@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "lib/sockets.h"
 
@@ -36,6 +37,9 @@ int main(int argc, char *argv[]){
     char buffer[buffer_size];
     int data_socket;
 
+    printf("trying to send message without knowing if connected");
+    char *msg = "hello";
+    rc = write(un_sock_fd, msg, strlen(msg)+1);
 
     printf("ready to receive messages\n");
 
