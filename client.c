@@ -1,3 +1,84 @@
-int main(){
-	return 0;
-};
+/*
+* File client.c
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+//modified from man 7 unix
+intmain(int argc, char *argv[]){
+   int                 ret;
+   int                 data_socket;
+   ssize_t             r, w;
+   struct sockaddr_un  addr;
+   int BUFFER_SIZE = 12;
+   char                buffer[BUFFER_SIZE];
+   char *SOCKET_NAME = "/tmp/test.Socket";
+
+   printf("test\n");
+
+   /* Create local socket. */
+
+   data_socket = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+   if (data_socket == -1) {
+       perror("socket");
+       exit(EXIT_FAILURE);
+   }
+
+   /*
+    * For portability clear the whole structure, since some
+    * implementations have additional (nonstandard) fields in
+    * the structure.
+    */
+
+   memset(&addr, 0, sizeof(addr));
+
+   /* Connect socket to socket address. */
+
+   addr.sun_family = AF_UNIX;
+   strncpy(addr.sun_path, SOCKET_NAME, sizeof(addr.sun_path) - 1);
+
+   printf("trying to connect to socket with name %s\n", SOCKET_NAME);
+   ret = connect(data_socket, (const struct sockaddr *) &addr,
+                  sizeof(addr));
+   if (ret == -1) {
+       fprintf(stderr, "The server is down.\n");
+       exit(EXIT_FAILURE);
+   }
+
+   /* Send arguments. */
+
+   for (int i = 1; i < argc; ++i) {
+       printf("sending argument: \"%s\"\n", argv[i]);
+       w = write(data_socket, argv[i], strlen(argv[i]) + 1);
+       if (w == -1) {
+           perror("write");
+           break;
+       }
+   }
+
+   /* Receive result. */
+   r = read(data_socket, buffer, sizeof(buffer));
+   if (r == -1) {
+       perror("read");
+       exit(EXIT_FAILURE);
+   }
+
+   /* Ensure buffer is 0-terminated. */
+
+   buffer[sizeof(buffer) - 1] = 0;
+
+   printf("Result = %s\n", buffer);
+
+   /* Close socket. */
+
+   close(data_socket);
+
+   exit(EXIT_SUCCESS);
+}
+

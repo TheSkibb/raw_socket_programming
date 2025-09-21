@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "sockets.h"
+
 int create_raw_socket(void){
 	//socket descriptor
 	int sd;
@@ -22,8 +24,12 @@ int create_raw_socket(void){
 }
 
 //borrowed from man 7 unix
-int create_unix_socket(char *socket_name){
+int create_unix_socket(
+        char *socket_name,
+        int mode
+){
 
+    //NOTICE: this will disconnect other existing connections
     unlink(socket_name);
 
     int connection_socket;
@@ -49,8 +55,14 @@ int create_unix_socket(char *socket_name){
     name.sun_family = AF_UNIX;
     strncpy(name.sun_path, socket_name, sizeof(name.sun_path) - 1);
 
-    ret = bind(connection_socket, (const struct sockaddr *) &name,
-              sizeof(name));
+    if(mode == UNIX_SOCKET_MODE_SERVER){
+        ret = bind(connection_socket, (const struct sockaddr *) &name,
+                  sizeof(name));
+    }else if(mode == UNIX_SOCKET_MODE_CLIENT){
+       ret = connect(connection_socket, (const struct sockaddr *) &name,
+          sizeof(name));
+    }
+
     if (ret == -1) {
        perror("bind");
        exit(EXIT_FAILURE);

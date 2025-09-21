@@ -8,6 +8,7 @@ void printHelp(){
     printf("ping_server [-h] <socket_lower>\n");
 }
 
+//lots of functionality here from man 7 unix
 int main(int argc, char *argv[]){
 
     if(argc < 1){
@@ -19,7 +20,8 @@ int main(int argc, char *argv[]){
         printHelp();
     }
 
-    int un_sock_fd = create_unix_socket("/tmp/test.Socket");
+    //TODO: change out for cmd arg
+    int un_sock_fd = create_unix_socket("/tmp/test.Socket", UNIX_SOCKET_MODE_SERVER);
 
     int max_backlog = 20;
 

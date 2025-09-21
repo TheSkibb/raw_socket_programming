@@ -16,5 +16,8 @@ mipd:
 server:
 	$(SERVER)
 
+client: 
+	$(CLIENT)
+
 clean:
-	rm -f client server mipd
+	rm -f ping_client ping_server mipd
