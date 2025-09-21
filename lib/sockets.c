@@ -29,8 +29,10 @@ int create_unix_socket(
         int mode
 ){
 
-    //NOTICE: this will disconnect other existing connections
-    unlink(socket_name);
+    if(mode == UNIX_SOCKET_MODE_SERVER){
+        //NOTICE: this will disconnect other existing connections
+        unlink(socket_name);
+    }
 
     int connection_socket;
     int ret;
@@ -50,22 +52,26 @@ int create_unix_socket(
 
     memset(&name, 0, sizeof(name));
 
-    /* Bind socket to socket name. */
 
     name.sun_family = AF_UNIX;
     strncpy(name.sun_path, socket_name, sizeof(name.sun_path) - 1);
 
     if(mode == UNIX_SOCKET_MODE_SERVER){
+        /* Bind socket to socket name. */
         ret = bind(connection_socket, (const struct sockaddr *) &name,
                   sizeof(name));
+        if (ret == -1) {
+           perror("bind");
+           exit(EXIT_FAILURE);
+        }
     }else if(mode == UNIX_SOCKET_MODE_CLIENT){
+       /* connect to socket with socket name. */
        ret = connect(connection_socket, (const struct sockaddr *) &name,
           sizeof(name));
-    }
-
-    if (ret == -1) {
-       perror("bind");
-       exit(EXIT_FAILURE);
+        if (ret == -1) {
+           perror("connect");
+           exit(EXIT_FAILURE);
+        }
     }
 
     return connection_socket;

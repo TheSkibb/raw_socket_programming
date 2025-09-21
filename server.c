@@ -59,7 +59,6 @@ int main(int argc, char *argv[]){
        }
 
        /* Ensure buffer is 0-terminated. */
-
        buffer[sizeof(buffer) - 1] = 0;
 
        printf("received \"%s\"\n", buffer);
@@ -67,7 +66,7 @@ int main(int argc, char *argv[]){
        /* Send result. */
 
        sprintf(buffer, "pong");
-       printf("now sending data to client");
+       printf("now sending response to client\n");
        w = write(data_socket, buffer, sizeof(buffer));
        if (w == -1) {
            perror("write");

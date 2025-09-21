@@ -10,49 +10,18 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "lib/sockets.h"
+
 //modified from man 7 unix
-intmain(int argc, char *argv[]){
-   int                 ret;
-   int                 data_socket;
+int main(int argc, char *argv[]){
    ssize_t             r, w;
-   struct sockaddr_un  addr;
    int BUFFER_SIZE = 12;
    char                buffer[BUFFER_SIZE];
    char *SOCKET_NAME = "/tmp/test.Socket";
 
-   printf("test\n");
-
-   /* Create local socket. */
-
-   data_socket = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-   if (data_socket == -1) {
-       perror("socket");
-       exit(EXIT_FAILURE);
-   }
-
-   /*
-    * For portability clear the whole structure, since some
-    * implementations have additional (nonstandard) fields in
-    * the structure.
-    */
-
-   memset(&addr, 0, sizeof(addr));
-
-   /* Connect socket to socket address. */
-
-   addr.sun_family = AF_UNIX;
-   strncpy(addr.sun_path, SOCKET_NAME, sizeof(addr.sun_path) - 1);
-
-   printf("trying to connect to socket with name %s\n", SOCKET_NAME);
-   ret = connect(data_socket, (const struct sockaddr *) &addr,
-                  sizeof(addr));
-   if (ret == -1) {
-       fprintf(stderr, "The server is down.\n");
-       exit(EXIT_FAILURE);
-   }
+   int data_socket = create_unix_socket(SOCKET_NAME, UNIX_SOCKET_MODE_CLIENT);
 
    /* Send arguments. */
-
    for (int i = 1; i < argc; ++i) {
        printf("sending argument: \"%s\"\n", argv[i]);
        w = write(data_socket, argv[i], strlen(argv[i]) + 1);
