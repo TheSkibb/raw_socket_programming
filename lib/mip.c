@@ -98,8 +98,6 @@ int handle_mip_packet(
         debugprint("received a PING message");
     }
 
-
-
     return rc;
 }
 
@@ -164,6 +162,7 @@ int send_mip_packet(
         return -1;
     }
     
+    debugprint("MIP packet sent to:");
     print_mac_addr(ethhdr.dst_mac, 6);
 
     free(msg);
@@ -177,6 +176,7 @@ int send_mip_arp_request(
     uint8_t src_mip_addr,
     uint8_t dst_mip_addr
 ){
+    debugprint("preparing to send mip arp request\n");
     //check if you are looking for your own address
     if(src_mip_addr == dst_mip_addr){
         return -1;
@@ -190,6 +190,8 @@ int send_mip_arp_request(
     arphdr.Type = 0;
     arphdr.Address = dst_mip_addr;
 
+    printf("sending mip arp packet:\n");
+    print_mip_arp_header(&arphdr);
     int rc = send_mip_packet(
         ifs,
         src_mac_addr,

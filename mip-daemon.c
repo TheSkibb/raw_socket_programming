@@ -2,6 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/epoll.h>
+#include <stdlib.h>
 
 #include "lib/sockets.h"
 #include "lib/interfaces.h"
@@ -13,28 +14,35 @@
 int printhelp(){
     printf("usage mipd [-h] [-d] <socket_upper> <MIP address>\n");
     return 0;
+    exit(EXIT_FAILURE);
 }
 
-int epoll_add_sock(int sd)
-{
-	struct epoll_event ev;
-
+int create_epoll_table(){
 	/* Create epoll table */
 	int epollfd = epoll_create1(0);
 	if (epollfd == -1) {
 		perror("epoll_create1");
-		return 1;
+		return -1;
 	}
+
+    return epollfd;
+}
+
+int epoll_add_sock(
+    int sd,
+    int epollfd
+){
+	struct epoll_event ev;
 
 	/* Add RAW socket to epoll table */
 	ev.events = EPOLLIN;
 	ev.data.fd = sd;
 	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sd, &ev) == -1) {
 		perror("epoll_ctl: raw_sock");
-		return 1;
+		return -1;
 	}
-
-	return epollfd;
+    return 0;
+    exit(EXIT_FAILURE);
 }
 
 int main(int argc, char *argv[]){
@@ -55,7 +63,7 @@ int main(int argc, char *argv[]){
         arg = argv[i];
         if(strcmp(arg, "-h") == 0){ //print help
             printhelp();
-            return 0;
+            exit(EXIT_FAILURE);
         }else if(strcmp(arg, "-d") == 0){ //enable debug prints
             set_debug(1);
             debugprint("you have started the daemon with debug prints");
@@ -89,36 +97,58 @@ int main(int argc, char *argv[]){
     int rc = 0;
 
     if(send){
-        //uint8_t broadcast[] = ETH_BROADCAST;
-        //rc = send_mip_packet(&interfaces, interfaces.addr[1].sll_addr, broadcast, 0x01, 0x02, (uint8_t *)argv[argc-1]);
-        rc = send_mip_arp_request(
+        uint8_t broadcast[] = ETH_BROADCAST;
+        rc = send_mip_packet(&interfaces, interfaces.addr[1].sll_addr, broadcast, 0x01, 0x02, (uint8_t *)argv[argc-1]);
+        /*rc = send_mip_arp_request(
                 &interfaces, 
                 interfaces.addr[1].sll_addr, 
                 0x01, 
                 0x02
         );
+        */
         if(rc < 0){
             perror("send_mip_packet");
-            return 0;
+            exit(EXIT_FAILURE);
         }
         debugprint("message sent");
     }
 
     debugprint("ready to receive message");
 
+    int unfd = create_unix_socket("/tmp/test.Socket", UNIX_SOCKET_MODE_SERVER);
+
+    //set up epoll
     int efd;
     int epoll_max_events = 10;
     struct epoll_event events[epoll_max_events];
+    
+    efd = create_epoll_table();
+    if(rc == -1){
+        printf("failed to create epoll table");
+        exit(EXIT_FAILURE);
+    }
+    rc = epoll_add_sock(raw_sock, efd);
+    if(rc != 0){
+        printf("failed to add raw socket to epoll table");
+        exit(EXIT_FAILURE);
+    }
+    rc = epoll_add_sock(unfd, efd);
+    if(rc != 0){
+        printf("failed to add unix socket to epoll table");
+        exit(EXIT_FAILURE);
+    }
 
-    efd = epoll_add_sock(raw_sock);
+    int BUFFER_SIZE = 12;
+    char                buffer[BUFFER_SIZE];
+    int data_socket;
 
     //wait for messages
     while(1) {
 		rc = epoll_wait(efd, events, epoll_max_events, -1);
 		if (rc == -1) {
 			perror("epoll_wait");
-			return 0;
-		} /* else if (events->data.fd == raw_sock) {
+            exit(EXIT_FAILURE);
+		} else if (events->data.fd == raw_sock) {
             debugprint("you received a packet");
             rc = handle_mip_packet(&interfaces);
             if(rc <= 0){
@@ -126,8 +156,24 @@ int main(int argc, char *argv[]){
                 perror("handle_mip_packet");
                 return 1;
             }
-		}
-        */
+		} /*else if(events->data.fd == unfd){
+            debugprint("received data via unix socket\n");
+
+        data_socket = accept(unfd, NULL, NULL);
+        if (data_socket == -1) {
+           perror("accept");
+           exit(EXIT_FAILURE);
+        }
+
+        // Wait for next data packet. 
+        rc = read(data_socket, buffer, sizeof(buffer));
+        if (rc == -1) {
+           perror("read");
+           exit(EXIT_FAILURE);
+        }
+
+        debugprint("data: \"%s\"\n", buffer);
+        }*/
 	}
 	close(raw_sock);
 

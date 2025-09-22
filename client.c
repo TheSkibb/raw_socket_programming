@@ -37,7 +37,7 @@ int main(int argc, char *argv[]){
    w = write(data_socket, "connected", strlen("connected") + 1);
    if (w == -1) {
        perror("write");
-       return 0;
+       exit(EXIT_FAILURE);
    }
 
    // Receive result. 

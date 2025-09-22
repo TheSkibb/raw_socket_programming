@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "sockets.h"
+#include "utils.h"
 
 int create_raw_socket(void){
 	//socket descriptor

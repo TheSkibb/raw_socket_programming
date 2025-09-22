@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "lib/sockets.h"
 
@@ -29,7 +30,7 @@ int main(int argc, char *argv[]){
     int rc = listen(un_sock_fd, max_backlog);
     if (rc == -1) {
         perror("listen");
-        return 0;
+        exit(EXIT_FAILURE);
     }
 
     int r;
@@ -52,14 +53,14 @@ int main(int argc, char *argv[]){
        data_socket = accept(un_sock_fd, NULL, NULL);
        if (data_socket == -1) {
            perror("accept");
-           return 0;
+           exit(EXIT_FAILURE);
        }
 
        /* Wait for next data packet. */
        r = read(data_socket, buffer, sizeof(buffer));
        if (r == -1) {
            perror("read");
-           return 0;
+           exit(EXIT_FAILURE);
        }
 
        /* Ensure buffer is 0-terminated. */
@@ -74,7 +75,7 @@ int main(int argc, char *argv[]){
        w = write(data_socket, buffer, sizeof(buffer));
        if (w == -1) {
            perror("write");
-           return 0;
+           exit(EXIT_FAILURE);
        }
 
        /* Close socket. */

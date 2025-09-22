@@ -19,6 +19,6 @@ void set_debug(int mode){
 }
 
 int get_debug(){
-    printf("returning debug %d", debug);
+    //printf("returning debug %d", debug);
     return debug;
 }
