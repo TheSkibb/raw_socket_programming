@@ -74,6 +74,7 @@ int create_unix_socket(
            exit(EXIT_FAILURE);
         }
     }
+    debugprint("returning unix socket with name %s", name);
 
     return connection_socket;
 }

@@ -66,18 +66,28 @@ int send_mip_packet(
     uint8_t src_hip_addr,
     //mip address of recipient
     uint8_t dst_hip_addr,
+    //type of mip package
+    uint8_t type,
     //service data unit (the actual data we are sending)
     uint8_t *sdu
 );
 int handle_mip_packet(
         struct ifs_data *ifs
 );
+
+//send a mip arp package
+//sends a ethernet broadcase message
 int send_mip_arp_request(
+    //interfaces
     struct ifs_data *ifs,
+    //the mac address of your maching
     uint8_t *src_mac_addr,
+    //the mip address of your machine
     uint8_t src_mip_addr,
+    //the mip address you are looking for
     uint8_t dst_mip_addr
 );
+
 int send_mip_arp_response(
     struct ifs_data *ifs,
     uint8_t *src_mac_addr,

@@ -33,10 +33,26 @@ void print_mip_arp_header(
     printf("---------------------\n");
 }
 
+void print_mip_header(
+    struct mip_hdr *miphdr
+){
+    if(get_debug() != 1){
+        return;
+    }
+    printf("------ MIP ------\n");
+    printf("dst_addr: %d\n", miphdr->dst_addr);
+    printf("src_addr: %d\n", miphdr->src_addr);
+    printf("ttl: %d\n", miphdr->ttl);
+    printf("sdu_len: %d\n", miphdr->sdu_len);
+    printf("sdu_type: %d\n", miphdr->sdu_type);
+    printf("-----------------\n");
+}
+
 int handle_mip_packet(
         struct ifs_data *ifs
     ){
 
+    debugprint("handling mip packet\n");
     struct sockaddr_ll so_name;
     struct eth_hdr ethhdr;
     struct mip_hdr miphdr;
@@ -76,8 +92,10 @@ int handle_mip_packet(
         return -1;
     }
 
+    print_mip_header(&miphdr);
+
     //mip arp handling
-    if(miphdr.sdu_type == MIP_TYPE_ARP &&  miphdr.dst_addr == 0xFF){
+    if(miphdr.sdu_type == MIP_TYPE_ARP){
         debugprint("type is MIP arp");
         struct mip_arp_hdr *miparphdr = (struct mip_arp_hdr *)&packet;
 
@@ -107,6 +125,7 @@ int send_mip_packet(
     uint8_t *dst_mac_addr,
     uint8_t src_mip_addr,
     uint8_t dst_mip_addr,
+    uint8_t type,
     uint8_t *sdu
 ){
     struct eth_hdr ethhdr;
@@ -133,7 +152,7 @@ int send_mip_packet(
     miphdr.src_addr = src_mip_addr;
     miphdr.ttl = 1;
     miphdr.sdu_len = (sizeof(sdu)+3)/4;
-    miphdr.sdu_type = 0;
+    miphdr.sdu_type = type;
 
     debugprint("sending SDU with number of bytes: %lu, and sdu_len: %d", sizeof(sdu), miphdr.sdu_len);
 
@@ -187,7 +206,7 @@ int send_mip_arp_request(
 
     struct mip_arp_hdr arphdr;
 
-    arphdr.Type = 0;
+    arphdr.Type = MIP_ARP_TYPE_REQUEST;
     arphdr.Address = dst_mip_addr;
 
     printf("sending mip arp packet:\n");
@@ -198,6 +217,7 @@ int send_mip_arp_request(
         eth_broadcast,
         src_mip_addr,
         mip_broadcast,
+        MIP_TYPE_ARP,
         (uint8_t *)&arphdr
     );
 
@@ -217,7 +237,7 @@ int send_mip_arp_response(
 
     struct mip_arp_hdr arphdr;
 
-    arphdr.Type = 1;
+    arphdr.Type = MIP_ARP_TYPE_RESPONSE;
     arphdr.Address = dst_mip_addr;
 
     int rc = send_mip_packet(
@@ -226,6 +246,7 @@ int send_mip_arp_response(
         eth_broadcast,
         src_mip_addr,
         mip_broadcast,
+        MIP_TYPE_ARP,
         (uint8_t *)&arphdr
     );
 

@@ -9,62 +9,62 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <sys/epoll.h>
 
 #include "lib/sockets.h"
 
 //modified from man 7 unix
 int main(int argc, char *argv[]){
-   ssize_t             r, w;
-   int BUFFER_SIZE = 12;
-   char                buffer[BUFFER_SIZE];
-   char *SOCKET_NAME = "/tmp/test.socket";
+    ssize_t             r, w;
+    int BUFFER_SIZE = 12;
+    char                buffer[BUFFER_SIZE];
+    char *SOCKET_NAME = "/tmp/test.socket";
 
-   int data_socket = create_unix_socket(SOCKET_NAME, UNIX_SOCKET_MODE_CLIENT);
+    int data_socket = create_unix_socket(SOCKET_NAME, UNIX_SOCKET_MODE_CLIENT);
 
-   /*
-   // Send arguments. 
-   for (int i = 1; i < argc; ++i) {
-       printf("sending argument: \"%s\"\n", argv[i]);
-       w = write(data_socket, argv[i], strlen(argv[i]) + 1);
-       if (w == -1) {
-           perror("write");
-           break;
-       }
-   }
-   */
-
-
-   w = write(data_socket, "connected", strlen("connected") + 1);
-   if (w == -1) {
+    w = write(data_socket, "ping", strlen("ping") + 1);
+    if (w == -1) {
        perror("write");
        exit(EXIT_FAILURE);
-   }
+    }
 
-   // Receive result. 
-   r = read(data_socket, buffer, sizeof(buffer));
-   if (r == -1) {
+
+
+    /* Create epoll table */
+    int epollfd = epoll_create1(0);
+    if (epollfd == -1) {
+        perror("epoll_create1");
+        return -1;
+    }
+
+
+
+    // Receive result. 
+    r = read(data_socket, buffer, sizeof(buffer));
+    if (r == -1) {
        perror("read");
        exit(EXIT_FAILURE);
-   }
+    }
 
-   // Ensure buffer is 0-terminated. 
+    // Ensure buffer is 0-terminated. 
 
-   buffer[sizeof(buffer) - 1] = 0;
+    buffer[sizeof(buffer) - 1] = 0;
 
-   printf("Result = %s\n", buffer);
+    printf("Result = %s\n", buffer);
 
-   printf("ready to receive data\n");
-   // Receive result. 
-   r = read(data_socket, buffer, sizeof(buffer));
-   if (r == -1) {
+    printf("ready to receive data\n");
+    // Receive result. 
+    r = read(data_socket, buffer, sizeof(buffer));
+    if (r == -1) {
        perror("read");
+       printf("read failed\n");
        exit(EXIT_FAILURE);
-   }
+    }
 
-   /* Close socket. */
+    /* Close socket. */
 
-   close(data_socket);
+    close(data_socket);
 
-   exit(EXIT_SUCCESS);
+    exit(EXIT_SUCCESS);
 }
 

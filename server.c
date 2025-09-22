@@ -23,7 +23,7 @@ int main(int argc, char *argv[]){
     }
 
     //TODO: change out for cmd arg
-    int un_sock_fd = create_unix_socket("/tmp/test.Socket", UNIX_SOCKET_MODE_SERVER);
+    int un_sock_fd = create_unix_socket("/tmp/test.socket", UNIX_SOCKET_MODE_SERVER);
 
     int max_backlog = 20;
 

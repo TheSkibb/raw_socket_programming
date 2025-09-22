@@ -115,28 +115,29 @@ int main(int argc, char *argv[]){
 
     int rc = 0;
 
+    /*
     if(send){
         uint8_t broadcast[] = ETH_BROADCAST;
         rc = send_mip_packet(&interfaces, interfaces.addr[1].sll_addr, broadcast, 0x01, 0x02, (uint8_t *)argv[argc-1]);
-        /*rc = send_mip_arp_request(
+        rc = send_mip_arp_request(
                 &interfaces, 
                 interfaces.addr[1].sll_addr, 
                 0x01, 
                 0x02
         );
-        */
         if(rc < 0){
             perror("send_mip_packet");
             exit(EXIT_FAILURE);
         }
         debugprint("message sent\n");
     }
+    */
 
     debugprint("ready to receive message:\n");
 
     //set up unix socket
     debugprint("setting up unix socket with name %s\n", unixSocketName);
-    int unix_sockfd = create_unix_socket("/tmp/test.Socket", UNIX_SOCKET_MODE_SERVER);
+    int unix_sockfd = create_unix_socket(unixSocketName, UNIX_SOCKET_MODE_SERVER);
     if(unix_sockfd < 0){
         perror("create_unix_socket");
         exit(EXIT_FAILURE);
@@ -208,32 +209,37 @@ int main(int argc, char *argv[]){
 	}
 */
     while (1) {
-    rc = epoll_wait(efd, events, epoll_max_events, -1);
-    if (rc == -1) {
-        perror("epoll_wait");
-        exit(EXIT_FAILURE);
-    }
+        rc = epoll_wait(efd, events, epoll_max_events, -1);
+        if (rc == -1) {
+            perror("epoll_wait");
+            exit(EXIT_FAILURE);
+        }
 
-    for (int i = 0; i < rc; i++) {
-        if (events[i].data.fd == raw_sockfd) {
-            debugprint("You received a packet on the raw socket");
-            rc = handle_mip_packet(&interfaces);
-            if (rc <= 0) {
-                debugprint("rc == %d", rc);
-                perror("handle_mip_packet");
-                return 1;
+        for (int i = 0; i < rc; i++) {
+            //check for events on raw socket
+            if (events[i].data.fd == raw_sockfd) {
+                debugprint("You received a packet on the raw socket");
+                rc = handle_mip_packet(&interfaces);
+                if (rc <= 0) {
+                    debugprint("rc == %d", rc);
+                    perror("handle_mip_packet");
+                    return 1;
+                }
+            }
+            
+            // Check for events on the Unix socket
+            else if (events[i].data.fd == unix_sockfd) {
+                //debugprint("You received a message on the Unix socket");
+                handle_unix_socket_message(unix_sockfd);
+                rc = send_mip_arp_request(
+                        &interfaces, 
+                        interfaces.addr[1].sll_addr, 
+                        0x01, 
+                        0x02
+                );
             }
         }
-        
-        // Check for events on the Unix socket
-        else if (events[i].data.fd == unix_sockfd) {
-            //debugprint("You received a message on the Unix socket");
-            // Implement handling for messages received on the Unix socket
-            // e.g., receive the message and process it accordingly
-            handle_unix_socket_message(unix_sockfd);
-        }
     }
-}
 	close(raw_sockfd);
     close(unix_sockfd);
     return 0; //success
