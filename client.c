@@ -17,7 +17,7 @@ int main(int argc, char *argv[]){
    ssize_t             r, w;
    int BUFFER_SIZE = 12;
    char                buffer[BUFFER_SIZE];
-   char *SOCKET_NAME = "/tmp/test.Socket";
+   char *SOCKET_NAME = "/tmp/test.socket";
 
    int data_socket = create_unix_socket(SOCKET_NAME, UNIX_SOCKET_MODE_CLIENT);
 

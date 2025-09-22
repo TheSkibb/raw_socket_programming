@@ -28,21 +28,38 @@ int create_epoll_table(){
     return epollfd;
 }
 
-int epoll_add_sock(
-    int sd,
-    int epollfd
-){
-	struct epoll_event ev;
+#define BUFFER_SIZE 256 // Define a buffer size for incoming messages
 
-	/* Add RAW socket to epoll table */
-	ev.events = EPOLLIN;
-	ev.data.fd = sd;
-	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sd, &ev) == -1) {
-		perror("epoll_ctl: raw_sock");
-		return -1;
-	}
-    return 0;
-    exit(EXIT_FAILURE);
+void handle_unix_socket_message(int unix_sockfd) {
+    char buffer[BUFFER_SIZE];
+    memset(buffer, 0, BUFFER_SIZE); // Clear the buffer
+    int data_socket;
+
+    // Accept a new connection
+    data_socket = accept(unix_sockfd, NULL, NULL);
+    if (data_socket == -1) {
+        perror("accept");
+        exit(EXIT_FAILURE);
+    }
+
+    // Wait for next data packet from the accepted socket
+    int rc = read(data_socket, buffer, sizeof(buffer) - 1); // Leave space for null-termination
+    if (rc == -1) {
+        perror("read");
+        close(data_socket); // Close the accepted socket on error
+        exit(EXIT_FAILURE);
+    }
+
+    // Properly handle the bytes read; ensure there's at least one byte read
+    if (rc > 0) {
+        // Null-terminate the string
+        buffer[rc] = '\0';
+        // Print the received message
+        printf("Received message on Unix socket: %s\n", buffer);
+    }
+
+    // Close the connected socket after done using it
+    close(data_socket);
 }
 
 int main(int argc, char *argv[]){
@@ -56,6 +73,7 @@ int main(int argc, char *argv[]){
 
     int send = 0;
     char *arg;
+    char unixSocketName[106] = "";
 
     //parse cmdline arguments
     //TODO: add mip address (i think, maybe in client and server instead)
@@ -75,18 +93,19 @@ int main(int argc, char *argv[]){
             send = 0;
         }else{ // name of unix socket
             debugprint("starting a unix socket with %s", arg);
+            strncpy(unixSocketName, arg, strlen(arg)+1);
             //return 1;
         }
     }
 
     /* raw socket setup */
     debugprint("setting up raw socket");
-    int raw_sock = create_raw_socket();
+    int raw_sockfd = create_raw_socket();
 
     /* interface setup */
     debugprint("setting up interfaces");
     struct ifs_data interfaces;
-    init_ifs(&interfaces, raw_sock);
+    init_ifs(&interfaces, raw_sockfd);
 
     //print the MAC addresses
     //A and C should have 1, B should have 2
@@ -110,45 +129,74 @@ int main(int argc, char *argv[]){
             perror("send_mip_packet");
             exit(EXIT_FAILURE);
         }
-        debugprint("message sent");
+        debugprint("message sent\n");
     }
 
-    debugprint("ready to receive message");
+    debugprint("ready to receive message:\n");
 
-    int unfd = create_unix_socket("/tmp/test.Socket", UNIX_SOCKET_MODE_SERVER);
+    //set up unix socket
+    debugprint("setting up unix socket with name %s\n", unixSocketName);
+    int unix_sockfd = create_unix_socket("/tmp/test.Socket", UNIX_SOCKET_MODE_SERVER);
+    if(unix_sockfd < 0){
+        perror("create_unix_socket");
+        exit(EXIT_FAILURE);
+    }
+
+    //set unix socket to be listening
+    int max_backlog = 10;
+    rc = listen(unix_sockfd, max_backlog);
+    if (rc == -1) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+
 
     //set up epoll
     int efd;
     int epoll_max_events = 10;
     struct epoll_event events[epoll_max_events];
     
+    //create epoll table
     efd = create_epoll_table();
     if(rc == -1){
         printf("failed to create epoll table");
         exit(EXIT_FAILURE);
     }
-    rc = epoll_add_sock(raw_sock, efd);
-    if(rc != 0){
-        printf("failed to add raw socket to epoll table");
-        exit(EXIT_FAILURE);
-    }
-    rc = epoll_add_sock(unfd, efd);
-    if(rc != 0){
-        printf("failed to add unix socket to epoll table");
+
+    struct epoll_event event_un;
+    event_un.events = EPOLLIN; // Listen for input events
+
+    // Add the Unix socket to epoll
+    event_un.data.fd = unix_sockfd;
+    if (epoll_ctl(efd, EPOLL_CTL_ADD, unix_sockfd, &event_un) == -1) {
+        perror("epoll_ctl unix");
+        close(efd);
+        close(unix_sockfd);
+        close(raw_sockfd);
         exit(EXIT_FAILURE);
     }
 
-    int BUFFER_SIZE = 12;
-    char                buffer[BUFFER_SIZE];
-    int data_socket;
 
+    struct epoll_event event_raw;
+    event_raw.events = EPOLLIN; // Listen for input events
+    // Add the raw socket to epoll
+    event_raw.data.fd = raw_sockfd;
+    if (epoll_ctl(efd, EPOLL_CTL_ADD, raw_sockfd, &event_raw) == -1) {
+        perror("epoll_ctl raw");
+        close(efd);
+        close(unix_sockfd);
+        close(raw_sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    /*
     //wait for messages
     while(1) {
 		rc = epoll_wait(efd, events, epoll_max_events, -1);
 		if (rc == -1) {
 			perror("epoll_wait");
             exit(EXIT_FAILURE);
-		} else if (events->data.fd == raw_sock) {
+		} else if (events->data.fd == raw_sockfd) {
             debugprint("you received a packet");
             rc = handle_mip_packet(&interfaces);
             if(rc <= 0){
@@ -156,28 +204,37 @@ int main(int argc, char *argv[]){
                 perror("handle_mip_packet");
                 return 1;
             }
-		} /*else if(events->data.fd == unfd){
-            debugprint("received data via unix socket\n");
-
-        data_socket = accept(unfd, NULL, NULL);
-        if (data_socket == -1) {
-           perror("accept");
-           exit(EXIT_FAILURE);
         }
-
-        // Wait for next data packet. 
-        rc = read(data_socket, buffer, sizeof(buffer));
-        if (rc == -1) {
-           perror("read");
-           exit(EXIT_FAILURE);
-        }
-
-        debugprint("data: \"%s\"\n", buffer);
-        }*/
 	}
-	close(raw_sock);
+*/
+    while (1) {
+    rc = epoll_wait(efd, events, epoll_max_events, -1);
+    if (rc == -1) {
+        perror("epoll_wait");
+        exit(EXIT_FAILURE);
+    }
 
-
-    close(raw_sock);
+    for (int i = 0; i < rc; i++) {
+        if (events[i].data.fd == raw_sockfd) {
+            debugprint("You received a packet on the raw socket");
+            rc = handle_mip_packet(&interfaces);
+            if (rc <= 0) {
+                debugprint("rc == %d", rc);
+                perror("handle_mip_packet");
+                return 1;
+            }
+        }
+        
+        // Check for events on the Unix socket
+        else if (events[i].data.fd == unix_sockfd) {
+            //debugprint("You received a message on the Unix socket");
+            // Implement handling for messages received on the Unix socket
+            // e.g., receive the message and process it accordingly
+            handle_unix_socket_message(unix_sockfd);
+        }
+    }
+}
+	close(raw_sockfd);
+    close(unix_sockfd);
     return 0; //success
 }
