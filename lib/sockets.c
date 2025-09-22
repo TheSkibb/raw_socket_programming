@@ -78,3 +78,36 @@ int create_unix_socket(
 
     return connection_socket;
 }
+
+void handle_unix_socket_message(int unix_sockfd) {
+    char buffer[BUFFER_SIZE];
+    memset(buffer, 0, BUFFER_SIZE); // Clear the buffer
+    int data_socket;
+
+    // Accept a new connection
+    data_socket = accept(unix_sockfd, NULL, NULL);
+    if (data_socket == -1) {
+        perror("accept");
+        exit(EXIT_FAILURE);
+    }
+
+    // Wait for next data packet from the accepted socket
+    int rc = read(data_socket, buffer, sizeof(buffer) - 1); // Leave space for null-termination
+    if (rc == -1) {
+        perror("read");
+        close(data_socket); // Close the accepted socket on error
+        exit(EXIT_FAILURE);
+    }
+
+    // Properly handle the bytes read; ensure there's at least one byte read
+    if (rc > 0) {
+        // Null-terminate the string
+        buffer[rc] = '\0';
+        // Print the received message
+        printf("Received message on Unix socket: %s\n", buffer);
+    }
+
+    // Close the connected socket after done using it
+    close(data_socket);
+}
+
