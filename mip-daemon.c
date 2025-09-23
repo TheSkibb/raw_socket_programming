@@ -33,26 +33,24 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
-    char *arg;
     char unixSocketName[MAX_UNIX_PATH_LENGTH] = "";
     uint8_t mip_address = 0xFF;
 
     //parse cmdline arguments
     for(int i = 1; i < argc; i++){
-        arg = argv[i];
-        if(strcmp(arg, "-h") == 0){ //print help
+        if(strcmp(argv[i], "-h") == 0){ //print help
             printhelp();
             exit(EXIT_FAILURE);
-        }else if(strcmp(arg, "-d") == 0){ //enable debug prints
+        }else if(strcmp(argv[i], "-d") == 0){ //enable debug prints
             set_debug(1);
             debugprint("you have started the daemon with debug prints");
         }else{ // name of unix socket
             if(strcmp(unixSocketName, "") == 0){
-                debugprint("unix socket name: %s", arg);
-                strncpy(unixSocketName, arg, strlen(arg)+1);
-            }else if (strcmp(arg, "") != 0){
-                mip_address = atoi(arg); 
-                debugprint("argument %s, gives MIP address is: %d", arg, mip_address);
+                debugprint("unix socket name: %s", argv[i]);
+                strncpy(unixSocketName, argv[i], strlen(argv[i])+1);
+            }else if (strcmp(argv[i], "") != 0){
+                mip_address = atoi(argv[i]); 
+                debugprint("argument %s, gives MIP address is: %d", argv[i], mip_address);
             }
         }
     }
@@ -184,6 +182,7 @@ int main(int argc, char *argv[]){
             perror("epoll_wait");
             exit(EXIT_FAILURE);
         }
+        printf("**************** socket activity!!!!\n");
 
         for (int i = 0; i < rc; i++) {
             //check for events on raw socket

@@ -58,6 +58,8 @@ struct pdu {
 int send_mip_packet(
     //interface data
     struct ifs_data *ifs, 
+    //the index of the interface to use
+    int addr_index,
     //mac address of sender
     uint8_t *src_mac_addr,
     //mac address of recipient

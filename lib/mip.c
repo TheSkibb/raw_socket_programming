@@ -121,6 +121,7 @@ int handle_mip_packet(
 
 int send_mip_packet(
     struct ifs_data *ifs,
+    int addr_index,
     uint8_t *src_mac_addr,
     uint8_t *dst_mac_addr,
     uint8_t src_mip_addr,
@@ -168,7 +169,8 @@ int send_mip_packet(
     msg = (struct msghdr *)calloc(1, sizeof(struct msghdr));
 
     //fill out message metadata struct
-    msg->msg_name = &(ifs->addr[0]);
+    //TODO: static addr
+    msg->msg_name = &(ifs->addr[addr_index]);
     msg->msg_namelen = sizeof(struct sockaddr_ll);
     msg->msg_iovlen = iov_len;
     msg->msg_iov = msgvec;
@@ -209,17 +211,30 @@ int send_mip_arp_request(
     arphdr.Type = MIP_ARP_TYPE_REQUEST;
     arphdr.Address = dst_mip_addr;
 
+    int rc = 0;
+
+    //TODO: send on all interfaces
     printf("sending mip arp packet:\n");
-    print_mip_arp_header(&arphdr);
-    int rc = send_mip_packet(
-        ifs,
-        src_mac_addr,
-        eth_broadcast,
-        src_mip_addr,
-        mip_broadcast,
-        MIP_TYPE_ARP,
-        (uint8_t *)&arphdr
-    );
+    for(int i = 0; i < ifs->ifn; i++){
+        debugprint("sending mip request %d / %d", i, ifs->ifn);
+        print_mip_arp_header(&arphdr);
+        rc = send_mip_packet(
+            ifs,
+            i,
+            ifs->addr[i].sll_addr,
+            eth_broadcast,
+            src_mip_addr,
+            mip_broadcast,
+            MIP_TYPE_ARP,
+            (uint8_t *)&arphdr
+        );
+
+        if(rc == -1){
+            printf("epic fail :(\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
 
     return rc;
 }
@@ -242,6 +257,7 @@ int send_mip_arp_response(
 
     int rc = send_mip_packet(
         ifs,
+        0,
         src_mac_addr,
         eth_broadcast,
         src_mip_addr,

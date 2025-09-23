@@ -16,11 +16,15 @@
 //modified from man 7 unix
 int main(int argc, char *argv[]){
     ssize_t             r, w;
-    int BUFFER_SIZE = 12;
     char                buffer[BUFFER_SIZE];
-    char *SOCKET_NAME = "/tmp/test.socket";
+    char socket_name[MAX_UNIX_PATH_LENGTH];
 
-    int data_socket = create_unix_socket(SOCKET_NAME, UNIX_SOCKET_MODE_CLIENT);
+    strncpy(socket_name, argv[1], strlen(argv[1])+1);
+    strncpy(buffer, argv[2], strlen(argv[1])+1);
+
+    printf("unix socket on %s\n", socket_name);
+
+    int data_socket = create_unix_socket(socket_name, UNIX_SOCKET_MODE_CLIENT);
 
     w = write(data_socket, "ping", strlen("ping") + 1);
     if (w == -1) {
@@ -28,16 +32,12 @@ int main(int argc, char *argv[]){
        exit(EXIT_FAILURE);
     }
 
-
-
     /* Create epoll table */
     int epollfd = epoll_create1(0);
     if (epollfd == -1) {
         perror("epoll_create1");
         return -1;
     }
-
-
 
     // Receive result. 
     r = read(data_socket, buffer, sizeof(buffer));
@@ -47,7 +47,6 @@ int main(int argc, char *argv[]){
     }
 
     // Ensure buffer is 0-terminated. 
-
     buffer[sizeof(buffer) - 1] = 0;
 
     printf("Result = %s\n", buffer);
@@ -62,7 +61,6 @@ int main(int argc, char *argv[]){
     }
 
     /* Close socket. */
-
     close(data_socket);
 
     exit(EXIT_SUCCESS);

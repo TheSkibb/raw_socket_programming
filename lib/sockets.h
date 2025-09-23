@@ -6,7 +6,7 @@
 // Define a buffer size for incoming unix messages
 #define BUFFER_SIZE 256 
 //On Linux, sun_path is 108 bytes in size; - from man 7 unix
-#define MAX_UNIX_PATH_LENGTH
+#define MAX_UNIX_PATH_LENGTH 108
 
 int create_raw_socket(void);
 int create_unix_socket(
