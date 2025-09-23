@@ -74,12 +74,13 @@ int handle_mip_packet(
     msgvec[1].iov_base = &miphdr;
     msgvec[1].iov_len = sizeof(struct mip_hdr);
 
-
     //read sdu
 	msgvec[2].iov_base = (void *)packet;
 	/* We can read up to 256 characters. Who cares? PONG is only 5 bytes */
 	msgvec[2].iov_len  = 256;
 
+    debugprint("====================");
+    debugprint("%d", so_name.sll_ifindex);
     //fill out message metadata
     msg.msg_name = &so_name;
     msg.msg_namelen = sizeof(struct sockaddr_ll);
@@ -92,6 +93,12 @@ int handle_mip_packet(
         return -1;
     }
 
+    print_mac_addr(so_name.sll_addr, 6);
+    debugprint("%d", so_name.sll_ifindex);
+    print_mac_addr(ifs->addr[0].sll_addr, 6);
+    print_mac_addr(ifs->addr[1].sll_addr, 6);
+    debugprint("====================");
+
     print_mip_header(&miphdr);
 
     //mip arp handling
@@ -100,8 +107,10 @@ int handle_mip_packet(
         struct mip_arp_hdr *miparphdr = (struct mip_arp_hdr *)&packet;
 
         if(miparphdr->Type == MIP_ARP_TYPE_REQUEST){
+
             debugprint("received MIP ARP request: ");
             send_mip_arp_response(ifs, ethhdr.dst_mac, ethhdr.src_mac, miphdr.dst_addr, miphdr.dst_addr);
+
         } else if(miparphdr->Type == MIP_ARP_TYPE_RESPONSE){
             debugprint("received MIP ARP response: ");
         } else {
@@ -174,7 +183,6 @@ int send_mip_packet(
     msg->msg_namelen = sizeof(struct sockaddr_ll);
     msg->msg_iovlen = iov_len;
     msg->msg_iov = msgvec;
-
 
     rc = sendmsg(ifs->rsock, msg, 0);
     if(rc == -1){
