@@ -121,7 +121,12 @@ int handle_mip_packet(
         if(miparphdr->Type == MIP_ARP_TYPE_REQUEST){
 
             debugprint("received MIP ARP request: ");
-            send_mip_arp_response(ifs, received_index, ethhdr.dst_mac, ethhdr.src_mac, miphdr.dst_addr, miphdr.dst_addr);
+            send_mip_arp_response(
+                    ifs, 
+                    received_index, 
+                    ethhdr.src_mac, 
+                    miphdr.dst_addr, 
+                    miphdr.dst_addr);
 
         } else if(miparphdr->Type == MIP_ARP_TYPE_RESPONSE){
             debugprint("received MIP ARP response: ");
@@ -143,7 +148,6 @@ int handle_mip_packet(
 int send_mip_packet(
     struct ifs_data *ifs,
     int addr_index,
-    uint8_t *src_mac_addr,
     uint8_t *dst_mac_addr,
     uint8_t src_mip_addr,
     uint8_t dst_mip_addr,
@@ -160,7 +164,7 @@ int send_mip_packet(
 
     // fill in eth_hdr 
     memcpy(ethhdr.dst_mac, dst_mac_addr, 6);
-    memcpy(ethhdr.src_mac, src_mac_addr, 6);
+    memcpy(ethhdr.src_mac, ifs->addr[addr_index].sll_addr, 6);
 
     //TODO: set to MIP type
     ethhdr.ethertype = htons(0xFFFF);
@@ -217,7 +221,6 @@ int send_mip_packet(
 
 int send_mip_arp_request(
     struct ifs_data *ifs,
-    uint8_t *src_mac_addr,
     uint8_t src_mip_addr,
     uint8_t dst_mip_addr
 ){
@@ -245,7 +248,6 @@ int send_mip_arp_request(
         rc = send_mip_packet(
             ifs,
             i,
-            ifs->addr[i].sll_addr,
             eth_broadcast,
             src_mip_addr,
             mip_broadcast,
@@ -266,7 +268,6 @@ int send_mip_arp_request(
 int send_mip_arp_response(
     struct ifs_data *ifs,
     int interface_index,
-    uint8_t *src_mac_addr,
     uint8_t *dst_mac_addr,
     uint8_t src_mip_addr,
     uint8_t dst_mip_addr
@@ -283,7 +284,6 @@ int send_mip_arp_response(
     int rc = send_mip_packet(
         ifs,
         interface_index,
-        src_mac_addr,
         eth_broadcast,
         src_mip_addr,
         mip_broadcast,

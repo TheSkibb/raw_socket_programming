@@ -192,7 +192,6 @@ int main(int argc, char *argv[]){
                 handle_unix_socket_message(unix_sockfd);
                 rc = send_mip_arp_request(
                         &interfaces, 
-                        interfaces.addr[1].sll_addr, 
                         0x01, 
                         0x02
                 );
