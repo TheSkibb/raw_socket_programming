@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 
 #include "interfaces.h"
+#include "arp_table.h"
 
 #define MIP_TYPE_ARP 0x01
 #define MIP_TYPE_PING 0x02
@@ -70,7 +71,8 @@ int send_mip_packet(
     uint8_t *sdu
 );
 int handle_mip_packet(
-        struct ifs_data *ifs
+        struct ifs_data *ifs,
+        struct arp_table *arp_t
 );
 
 //send a mip arp package

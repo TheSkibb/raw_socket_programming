@@ -8,6 +8,7 @@
 #include "lib/interfaces.h"
 #include "lib/mip.h"
 #include "lib/utils.h"
+#include "lib/arp_table.h"
 
 int printhelp(){
     printf("usage mipd [-h] [-d] <socket_upper> <MIP address>\n");
@@ -111,7 +112,6 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
-
     //set up epoll
     int efd;
     int epoll_max_events = 10;
@@ -150,6 +150,9 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
+    //set up arp table
+    struct arp_table arp_t;
+
     while (1) {
         rc = epoll_wait(efd, events, epoll_max_events, -1);
         if (rc == -1) {
@@ -162,7 +165,7 @@ int main(int argc, char *argv[]){
             //check for events on raw socket
             if (events[i].data.fd == raw_sockfd) {
                 debugprint("You received a packet on the raw socket");
-                rc = handle_mip_packet(&interfaces);
+                rc = handle_mip_packet(&interfaces, &arp_t);
                 if (rc <= 0) {
                     debugprint("rc == %d", rc);
                     perror("handle_mip_packet");

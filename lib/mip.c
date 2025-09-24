@@ -10,6 +10,7 @@
 #include "interfaces.h"
 #include "mip.h"
 #include "utils.h"
+#include "arp_table.h"
 
 struct hello_header {
 	uint8_t dest;
@@ -49,7 +50,8 @@ void print_mip_header(
 }
 
 int handle_mip_packet(
-        struct ifs_data *ifs
+        struct ifs_data *ifs,
+        struct arp_table *arp_t
     ){
 
     debugprint("handling mip packet\n");
@@ -96,10 +98,6 @@ int handle_mip_packet(
 
     for(int i = 0; i < MAX_IF; i++){
         if(ifs->addr[i].sll_ifindex == so_name.sll_ifindex){
-            debugprint("================");
-            debugprint("received on interface %d", i);
-            print_mac_addr(ifs->addr[i].sll_addr, 6);
-            debugprint("================");
             received_index = i;
         }
     }
@@ -109,13 +107,31 @@ int handle_mip_packet(
         exit(EXIT_FAILURE);
     }
 
-
     print_mip_header(&miphdr);
 
     //mip arp handling
     if(miphdr.sdu_type == MIP_TYPE_ARP){
         debugprint("type is MIP arp");
         struct mip_arp_hdr *miparphdr = (struct mip_arp_hdr *)&packet;
+
+        //check if this address already is in our mip cache
+        int index = arp_t_get_index_from_mip_addr(arp_t, miphdr.src_addr);
+
+        debugprint("index from table: %d", index);
+
+        if(index == -1){
+            debugprint("address was not found in table");
+            index = arp_t_add_entry(arp_t, miphdr.src_addr, received_index, ethhdr.src_mac);
+            if(index == -1){
+                printf("not enough space in arp table\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        debugprint("THIS IS THE INDEX: %d", index);
+        debugprint("mip: %d", arp_t->mip_addr[index]);
+        debugprint("interface: %d", arp_t->sll_ifindex[index]);
+        print_mac_addr(arp_t->sll_addr[index], 6);
 
         if(miparphdr->Type == MIP_ARP_TYPE_REQUEST){
 
@@ -205,10 +221,6 @@ int send_mip_packet(
         return -1;
     }
 
-    debugprint("=================");
-    debugprint("ifindex out: %d", ifs->addr[addr_index].sll_ifindex);
-    debugprint("=================");
-    
     debugprint("MIP packet sent to:");
     print_mac_addr(ethhdr.dst_mac, 6);
 
