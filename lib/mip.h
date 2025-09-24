@@ -62,8 +62,6 @@ int send_mip_packet(
     int addr_index,
     //mac address of recipient
     uint8_t *dst_mac_addr,
-    //mip address of sender
-    uint8_t src_hip_addr,
     //mip address of recipient
     uint8_t dst_hip_addr,
     //type of mip package
@@ -80,8 +78,6 @@ int handle_mip_packet(
 int send_mip_arp_request(
     //interfaces
     struct ifs_data *ifs,
-    //the mip address of your machine
-    uint8_t src_mip_addr,
     //the mip address you are looking for
     uint8_t dst_mip_addr
 );
@@ -90,7 +86,6 @@ int send_mip_arp_response(
     struct ifs_data *ifs,
     int interface_index,
     uint8_t *dst_mac_addr,
-    uint8_t src_mip_addr,
     uint8_t dst_mip_addr
 );
 

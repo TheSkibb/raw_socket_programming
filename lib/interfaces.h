@@ -26,6 +26,8 @@ struct ifs_data {
 	int rsock;
 	//interface number (unique for each interface)
 	int ifn;
+    //mip address
+    uint8_t mip_addr;
 };
 
 void get_mac_from_interfaces(struct ifs_data *);

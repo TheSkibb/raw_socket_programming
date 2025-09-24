@@ -111,7 +111,6 @@ int handle_mip_packet(
 
 
     print_mip_header(&miphdr);
-    int ifindex = so_name.sll_ifindex;
 
     //mip arp handling
     if(miphdr.sdu_type == MIP_TYPE_ARP){
@@ -122,11 +121,11 @@ int handle_mip_packet(
 
             debugprint("received MIP ARP request: ");
             send_mip_arp_response(
-                    ifs, 
-                    received_index, 
-                    ethhdr.src_mac, 
-                    miphdr.dst_addr, 
-                    miphdr.dst_addr);
+                ifs, 
+                received_index, 
+                ethhdr.src_mac, 
+                miphdr.dst_addr
+            );
 
         } else if(miparphdr->Type == MIP_ARP_TYPE_RESPONSE){
             debugprint("received MIP ARP response: ");
@@ -149,7 +148,6 @@ int send_mip_packet(
     struct ifs_data *ifs,
     int addr_index,
     uint8_t *dst_mac_addr,
-    uint8_t src_mip_addr,
     uint8_t dst_mip_addr,
     uint8_t type,
     uint8_t *sdu
@@ -175,7 +173,7 @@ int send_mip_packet(
 
     //fill in mip hdr
     miphdr.dst_addr = dst_mip_addr;
-    miphdr.src_addr = src_mip_addr;
+    miphdr.src_addr = ifs->mip_addr;
     miphdr.ttl = 1;
     miphdr.sdu_len = (sizeof(sdu)+3)/4;
     miphdr.sdu_type = type;
@@ -221,12 +219,11 @@ int send_mip_packet(
 
 int send_mip_arp_request(
     struct ifs_data *ifs,
-    uint8_t src_mip_addr,
     uint8_t dst_mip_addr
 ){
     debugprint("preparing to send mip arp request\n");
     //check if you are looking for your own address
-    if(src_mip_addr == dst_mip_addr){
+    if(ifs->mip_addr== dst_mip_addr){
         return -1;
     }
 
@@ -249,7 +246,6 @@ int send_mip_arp_request(
             ifs,
             i,
             eth_broadcast,
-            src_mip_addr,
             mip_broadcast,
             MIP_TYPE_ARP,
             (uint8_t *)&arphdr
@@ -269,7 +265,6 @@ int send_mip_arp_response(
     struct ifs_data *ifs,
     int interface_index,
     uint8_t *dst_mac_addr,
-    uint8_t src_mip_addr,
     uint8_t dst_mip_addr
     ){
 
@@ -285,7 +280,6 @@ int send_mip_arp_response(
         ifs,
         interface_index,
         eth_broadcast,
-        src_mip_addr,
         mip_broadcast,
         MIP_TYPE_ARP,
         (uint8_t *)&arphdr

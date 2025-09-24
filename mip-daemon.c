@@ -83,6 +83,8 @@ int main(int argc, char *argv[]){
     struct ifs_data interfaces;
     init_ifs(&interfaces, raw_sockfd);
 
+    interfaces.mip_addr = mip_address;
+
     //print the MAC addresses
     //A and C should have 1, B should have 2
     for(int i = 0; i < interfaces.ifn; i++){
@@ -175,6 +177,7 @@ int main(int argc, char *argv[]){
         printf("**************** socket activity!!!!\n");
 
         for (int i = 0; i < rc; i++) {
+
             //check for events on raw socket
             if (events[i].data.fd == raw_sockfd) {
                 debugprint("You received a packet on the raw socket");
@@ -188,11 +191,10 @@ int main(int argc, char *argv[]){
             
             // Check for events on the Unix socket
             else if (events[i].data.fd == unix_sockfd) {
-                //debugprint("You received a message on the Unix socket");
+
                 handle_unix_socket_message(unix_sockfd);
                 rc = send_mip_arp_request(
                         &interfaces, 
-                        0x01, 
                         0x02
                 );
             }
