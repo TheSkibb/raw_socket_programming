@@ -92,6 +92,7 @@ int send_mip_arp_request(
 
 int send_mip_arp_response(
     struct ifs_data *ifs,
+    int interface_index,
     uint8_t *src_mac_addr,
     uint8_t *dst_mac_addr,
     uint8_t src_mip_addr,

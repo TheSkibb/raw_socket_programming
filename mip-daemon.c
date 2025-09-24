@@ -38,13 +38,19 @@ int main(int argc, char *argv[]){
 
     //parse cmdline arguments
     for(int i = 1; i < argc; i++){
+
         if(strcmp(argv[i], "-h") == 0){ //print help
+                                        //
             printhelp();
-            exit(EXIT_FAILURE);
+            exit(EXIT_SUCCESS);
+
         }else if(strcmp(argv[i], "-d") == 0){ //enable debug prints
+                                              //
             set_debug(1);
             debugprint("you have started the daemon with debug prints");
-        }else{ // name of unix socket
+
+        }else{ // name of unix socket & mip address
+               
             if(strcmp(unixSocketName, "") == 0){
                 debugprint("unix socket name: %s", argv[i]);
                 strncpy(unixSocketName, argv[i], strlen(argv[i])+1);
@@ -52,7 +58,9 @@ int main(int argc, char *argv[]){
                 mip_address = atoi(argv[i]); 
                 debugprint("argument %s, gives MIP address is: %d", argv[i], mip_address);
             }
+
         }
+
     }
 
     //validate cmdline arguments
@@ -158,24 +166,6 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
-    /*
-    //wait for messages
-    while(1) {
-		rc = epoll_wait(efd, events, epoll_max_events, -1);
-		if (rc == -1) {
-			perror("epoll_wait");
-            exit(EXIT_FAILURE);
-		} else if (events->data.fd == raw_sockfd) {
-            debugprint("you received a packet");
-            rc = handle_mip_packet(&interfaces);
-            if(rc <= 0){
-                debugprint("rc == %d", rc);
-                perror("handle_mip_packet");
-                return 1;
-            }
-        }
-	}
-*/
     while (1) {
         rc = epoll_wait(efd, events, epoll_max_events, -1);
         if (rc == -1) {

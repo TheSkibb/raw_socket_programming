@@ -16,7 +16,7 @@ struct eth_hdr {
 } __attribute__((packed));
 
 //we have max 3 nodes in out topology, therefore max_interfaces=3
-#define MAX_IF		3
+#define MAX_IF 3
 
 /*interface data*/
 struct ifs_data {

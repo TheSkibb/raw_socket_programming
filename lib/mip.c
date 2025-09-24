@@ -79,8 +79,6 @@ int handle_mip_packet(
 	/* We can read up to 256 characters. Who cares? PONG is only 5 bytes */
 	msgvec[2].iov_len  = 256;
 
-    debugprint("====================");
-    debugprint("%d", so_name.sll_ifindex);
     //fill out message metadata
     msg.msg_name = &so_name;
     msg.msg_namelen = sizeof(struct sockaddr_ll);
@@ -93,13 +91,27 @@ int handle_mip_packet(
         return -1;
     }
 
-    print_mac_addr(so_name.sll_addr, 6);
-    debugprint("%d", so_name.sll_ifindex);
-    print_mac_addr(ifs->addr[0].sll_addr, 6);
-    print_mac_addr(ifs->addr[1].sll_addr, 6);
-    debugprint("====================");
+    //find out what interface we received data on
+    int received_index = -1;
+
+    for(int i = 0; i < MAX_IF; i++){
+        if(ifs->addr[i].sll_ifindex == so_name.sll_ifindex){
+            debugprint("================");
+            debugprint("received on interface %d", i);
+            print_mac_addr(ifs->addr[i].sll_addr, 6);
+            debugprint("================");
+            received_index = i;
+        }
+    }
+
+    if(received_index == -1){
+        printf("could not find out what interface we received data on");
+        exit(EXIT_FAILURE);
+    }
+
 
     print_mip_header(&miphdr);
+    int ifindex = so_name.sll_ifindex;
 
     //mip arp handling
     if(miphdr.sdu_type == MIP_TYPE_ARP){
@@ -109,7 +121,7 @@ int handle_mip_packet(
         if(miparphdr->Type == MIP_ARP_TYPE_REQUEST){
 
             debugprint("received MIP ARP request: ");
-            send_mip_arp_response(ifs, ethhdr.dst_mac, ethhdr.src_mac, miphdr.dst_addr, miphdr.dst_addr);
+            send_mip_arp_response(ifs, received_index, ethhdr.dst_mac, ethhdr.src_mac, miphdr.dst_addr, miphdr.dst_addr);
 
         } else if(miparphdr->Type == MIP_ARP_TYPE_RESPONSE){
             debugprint("received MIP ARP response: ");
@@ -190,6 +202,10 @@ int send_mip_packet(
         free(msg);
         return -1;
     }
+
+    debugprint("=================");
+    debugprint("ifindex out: %d", ifs->addr[addr_index].sll_ifindex);
+    debugprint("=================");
     
     debugprint("MIP packet sent to:");
     print_mac_addr(ethhdr.dst_mac, 6);
@@ -249,6 +265,7 @@ int send_mip_arp_request(
 
 int send_mip_arp_response(
     struct ifs_data *ifs,
+    int interface_index,
     uint8_t *src_mac_addr,
     uint8_t *dst_mac_addr,
     uint8_t src_mip_addr,
@@ -265,7 +282,7 @@ int send_mip_arp_response(
 
     int rc = send_mip_packet(
         ifs,
-        0,
+        interface_index,
         src_mac_addr,
         eth_broadcast,
         src_mip_addr,
