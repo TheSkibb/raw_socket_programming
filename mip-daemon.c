@@ -27,7 +27,7 @@ int create_epoll_table(){
 }
 
 int main(int argc, char *argv[]){
-    /* determine mode */
+    // determine mode 
     if(argc <= 2){
         printf("arguments supplied, see usage with -h\n");
         return 1;
@@ -74,11 +74,11 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
-    /* raw socket setup */
+    // raw socket setup 
     debugprint("setting up raw socket");
     int raw_sockfd = create_raw_socket();
 
-    /* interface setup */
+    // interface setup 
     debugprint("setting up interfaces");
     struct ifs_data interfaces;
     init_ifs(&interfaces, raw_sockfd);
@@ -92,24 +92,6 @@ int main(int argc, char *argv[]){
     }
 
     int rc = 0;
-
-    /*
-    if(send){
-        uint8_t broadcast[] = ETH_BROADCAST;
-        rc = send_mip_packet(&interfaces, interfaces.addr[1].sll_addr, broadcast, 0x01, 0x02, (uint8_t *)argv[argc-1]);
-        rc = send_mip_arp_request(
-                &interfaces, 
-                interfaces.addr[1].sll_addr, 
-                0x01, 
-                0x02
-        );
-        if(rc < 0){
-            perror("send_mip_packet");
-            exit(EXIT_FAILURE);
-        }
-        debugprint("message sent\n");
-    }
-    */
 
     debugprint("ready to receive message:\n");
 
@@ -174,7 +156,6 @@ int main(int argc, char *argv[]){
             perror("epoll_wait");
             exit(EXIT_FAILURE);
         }
-        printf("**************** socket activity!!!!\n");
 
         for (int i = 0; i < rc; i++) {
 

@@ -8,7 +8,9 @@
 //On Linux, sun_path is 108 bytes in size; - from man 7 unix
 #define MAX_UNIX_PATH_LENGTH 108
 
+//returns file descriptor of the created socket
 int create_raw_socket(void);
+//returns file descriptor of the created socket
 int create_unix_socket(
     char *name, 
     int mode

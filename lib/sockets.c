@@ -88,6 +88,7 @@ void handle_unix_socket_message(int unix_sockfd) {
     data_socket = accept(unix_sockfd, NULL, NULL);
     if (data_socket == -1) {
         perror("accept");
+        close(data_socket); 
         exit(EXIT_FAILURE);
     }
 
@@ -95,11 +96,12 @@ void handle_unix_socket_message(int unix_sockfd) {
     int rc = read(data_socket, buffer, sizeof(buffer) - 1); // Leave space for null-termination
     if (rc == -1) {
         perror("read");
-        close(data_socket); // Close the accepted socket on error
+        close(data_socket); 
         exit(EXIT_FAILURE);
     }
 
     // Properly handle the bytes read; ensure there's at least one byte read
+    // rc = number of bytes received from read operation
     if (rc > 0) {
         // Null-terminate the string
         buffer[rc] = '\0';
@@ -107,7 +109,6 @@ void handle_unix_socket_message(int unix_sockfd) {
         printf("Received message on Unix socket: %s\n", buffer);
     }
 
-    // Close the connected socket after done using it
     close(data_socket);
 }
 
