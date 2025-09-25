@@ -24,7 +24,6 @@ int arp_t_get_index_from_mip_addr(
 ){
     for(int i = 0; i < arp_t->arp_table_n; i++){
         if(arp_t->mip_addr[i] == mip_addr){
-            printf("we found the address!!!! @%d", i);
             return i;
         }
     }

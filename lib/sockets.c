@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 
 #include "sockets.h"
 #include "utils.h"
@@ -80,6 +81,7 @@ int create_unix_socket(
 }
 
 void handle_unix_socket_message(int unix_sockfd, struct unix_sock_sdu *sdu) {
+
     char buffer[BUFFER_SIZE];
     memset(buffer, 0, BUFFER_SIZE); // Clear the buffer
     int data_socket;
@@ -92,6 +94,7 @@ void handle_unix_socket_message(int unix_sockfd, struct unix_sock_sdu *sdu) {
         exit(EXIT_FAILURE);
     }
 
+    /*
     // Wait for next data packet from the accepted socket
     int rc = read(data_socket, sdu, sizeof(struct unix_sock_sdu)); // Leave space for null-termination
     if (rc == -1) {
@@ -106,10 +109,12 @@ void handle_unix_socket_message(int unix_sockfd, struct unix_sock_sdu *sdu) {
         // Null-terminate the string
         buffer[rc] = '\0';
         // Print the received message
-        printf("Received message on Unix socket: %s\n", buffer);
         //copy the data into the struct
     }
 
+    */
+    char temp[256] = "test fra unix handling";
+    memcpy(sdu->payload, temp, 256);
     close(data_socket);
 }
 

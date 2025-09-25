@@ -13,13 +13,19 @@ void printHelp(){
 //lots of functionality here from man 7 unix
 int main(int argc, char *argv[]){
 
-    if(argc < 1){
+    if(argc <= 1){
         printf("too few arguments\n");
         printHelp();
+        return 1;
     }
-    if(argc > 1){
+    if(argc >= 3){
         printf("too many arguments\n");
         printHelp();
+        return 1;
+    }
+    if(strcmp(argv[1], "-h") == 0 ){
+        printHelp();
+        return 0;
     }
 
     //TODO: change out for cmd arg
@@ -37,10 +43,6 @@ int main(int argc, char *argv[]){
     int buffer_size = 12;
     char buffer[buffer_size];
     int data_socket;
-
-    printf("trying to send message without knowing if connected");
-    char *msg = "hello";
-    rc = write(un_sock_fd, msg, strlen(msg)+1);
 
     printf("ready to receive messages\n");
 

@@ -128,7 +128,7 @@ int main(int argc, char *argv[]){
     event_un.events = EPOLLIN; // Listen for input events
 
     // Add the Unix socket to epoll
-    event_un.data.fd = unix_sockfd;
+        event_un.data.fd = unix_sockfd;
     if (epoll_ctl(efd, EPOLL_CTL_ADD, unix_sockfd, &event_un) == -1) {
         perror("epoll_ctl unix");
         close(efd);
@@ -154,6 +154,7 @@ int main(int argc, char *argv[]){
     struct arp_table arp_t;
 
     debugprint("setup done, now entering main loop =====================\n\n\n\n");
+    int skip = 0;
 
     while (1) {
         rc = epoll_wait(efd, events, epoll_max_events, -1);
@@ -163,17 +164,23 @@ int main(int argc, char *argv[]){
         }
 
         for (int i = 0; i < rc; i++) {
-
             //check for events on raw socket
             if (events[i].data.fd == raw_sockfd) {
                 debugprint("=received on raw socket=================================");
+
+                if(skip == 1){
+                    skip = 0;
+                    continue;
+                }
+
                 rc = handle_mip_packet(&interfaces, &arp_t);
-                if (rc <= 0) {
+                if (rc < 0) {
                     debugprint("rc == %d", rc);
                     perror("handle_mip_packet");
                     return 1;
                 }
-                debugprint("========================================================");
+                skip = 1;
+                debugprint("===========================================end raw sock=");
             }
             
             // Check for events on the Unix socket
@@ -192,8 +199,12 @@ int main(int argc, char *argv[]){
                     debugprint("mip address %d is not in the arp table", sdu.mip_addr);
                     rc = send_mip_arp_request(
                             &interfaces, 
-                            0x02
+                            sdu.mip_addr
                     );
+                    if(rc < 0){
+                        printf("something wrong happened while sending mip arp\n");
+                        exit(EXIT_FAILURE);
+                    }
                 }else{
                     debugprint("mip address %d IS IN the arp table NOW", arp_t.mip_addr[index]);
                     send_mip_packet(
@@ -202,7 +213,7 @@ int main(int argc, char *argv[]){
                             arp_t.sll_addr[index],
                             sdu.mip_addr, 
                             MIP_TYPE_PING,
-                            (uint8_t *)sdu.payload);
+                            (uint8_t *)&sdu.payload);
                 }
 
                 debugprint("received on unix socket: %d, \"%s\"", sdu.mip_addr, sdu.payload);

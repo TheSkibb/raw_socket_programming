@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <sys/ioctl.h>
 
 #include "interfaces.h"
 #include "mip.h"
@@ -54,6 +55,12 @@ int handle_mip_packet(
         struct arp_table *arp_t
     ){
 
+    //we check if data is available, because sending a packet triggers the epoll, 
+    //so there may not be data to handle
+    if(is_data_available(ifs->rsock) != 1){
+        return 0;
+    }
+
     debugprint("handling mip packet\n");
     struct sockaddr_ll so_name;
     struct eth_hdr ethhdr;
@@ -87,6 +94,7 @@ int handle_mip_packet(
     msg.msg_iovlen = iov_len;
     msg.msg_iov = msgvec;
 
+    debugprint("i want to receive message");
     rc = recvmsg(ifs->rsock, &msg, 0);
     if(rc <= 0){
         perror("recvmsg");
@@ -154,7 +162,7 @@ int handle_mip_packet(
 
     //send up to unix socket
     if(miphdr.sdu_type == MIP_TYPE_PING){
-        debugprint("received a PING message");
+        debugprint("received PING message: %s", packet);
     }
 
     return rc;
@@ -202,7 +210,7 @@ int send_mip_packet(
 
     //point to sdu
     msgvec[2].iov_base = sdu;
-    msgvec[2].iov_len = sizeof(sdu);
+    msgvec[2].iov_len = 256;
 
     //allocate a zeroed out message info struct
     msg = (struct msghdr *)calloc(1, sizeof(struct msghdr));
@@ -235,7 +243,9 @@ int send_mip_arp_request(
 ){
     debugprint("preparing to send mip arp request\n");
     //check if you are looking for your own address
-    if(ifs->mip_addr== dst_mip_addr){
+    if(ifs->mip_addr==dst_mip_addr){
+        debugprint("you are looking for your own mip address, something wrong has happened");
+        debugprint("%d == %d", ifs->mip_addr, dst_mip_addr);
         return -1;
     }
 
@@ -250,7 +260,6 @@ int send_mip_arp_request(
     int rc = 0;
 
     //TODO: send on all interfaces
-    printf("sending mip arp packet:\n");
     for(int i = 0; i < ifs->ifn; i++){
         debugprint("sending mip request %d / %d", i, ifs->ifn);
         print_mip_arp_header(&arphdr);
@@ -263,7 +272,7 @@ int send_mip_arp_request(
             (uint8_t *)&arphdr
         );
 
-        if(rc == -1){
+        if(rc < 1){
             printf("epic fail :(\n");
             exit(EXIT_FAILURE);
         }

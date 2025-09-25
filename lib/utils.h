@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+/*debug stuff*/
+
 //prints if global debug flag is set
 //takes in format string and arguments
 //NOTICE: adds \n to end of string
@@ -9,5 +11,9 @@ int debugprint(const char *format, ...);
 void set_debug(int mode);
 //returns the global debug flag
 int get_debug();
+
+
+/*socket stuff(ish)*/
+int is_data_available(int sockfd);
 
 #endif
