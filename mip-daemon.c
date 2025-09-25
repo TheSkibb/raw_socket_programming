@@ -156,6 +156,11 @@ int main(int argc, char *argv[]){
     debugprint("setup done, now entering main loop =====================\n\n\n\n");
     int skip = 0;
 
+    //global message to send
+    //this way we can just check if this one is set if we receive an arp response
+    struct unix_sock_sdu sdu;
+    memset(&sdu, 0, sizeof(struct unix_sock_sdu));
+
     while (1) {
         rc = epoll_wait(efd, events, epoll_max_events, -1);
         if (rc == -1) {
@@ -173,7 +178,7 @@ int main(int argc, char *argv[]){
                     continue;
                 }
 
-                rc = handle_mip_packet(&interfaces, &arp_t);
+                rc = handle_mip_packet(&interfaces, &arp_t, &sdu);
                 if (rc < 0) {
                     debugprint("rc == %d", rc);
                     perror("handle_mip_packet");
@@ -187,9 +192,9 @@ int main(int argc, char *argv[]){
             else if (events->data.fd == unix_sockfd) {
                 debugprint("=received on unix socket================================");
 
-                struct unix_sock_sdu sdu;
                 memset(&sdu, 0, sizeof(struct unix_sock_sdu));
 
+                //copies message from unix socket into sdu
                 handle_unix_socket_message(unix_sockfd, &sdu);
 
                 //check if the received mip address is in the arp table
@@ -217,7 +222,7 @@ int main(int argc, char *argv[]){
                 }
 
                 debugprint("received on unix socket: %d, \"%s\"", sdu.mip_addr, sdu.payload);
-                debugprint("========================================================");
+                debugprint("==========================================end unix sock=");
             }
         //}
     }

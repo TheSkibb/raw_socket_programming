@@ -12,12 +12,7 @@
 #include "mip.h"
 #include "utils.h"
 #include "arp_table.h"
-
-struct hello_header {
-	uint8_t dest;
-	uint8_t src;
-	uint8_t sdu_len : 4;
-} __attribute__((packed));
+#include "sockets.h"
 
 void print_mip_arp_header(
     struct mip_arp_hdr *miparphdr
@@ -52,7 +47,8 @@ void print_mip_header(
 
 int handle_mip_packet(
         struct ifs_data *ifs,
-        struct arp_table *arp_t
+        struct arp_table *arp_t,
+        struct unix_sock_sdu *sdu
     ){
 
     //we check if data is available, because sending a packet triggers the epoll, 
@@ -141,6 +137,7 @@ int handle_mip_packet(
         debugprint("interface: %d", arp_t->sll_ifindex[index]);
         print_mac_addr(arp_t->sll_addr[index], 6);
 
+        //if it is a request we send a response
         if(miparphdr->Type == MIP_ARP_TYPE_REQUEST){
 
             debugprint("received MIP ARP request: ");
@@ -152,7 +149,22 @@ int handle_mip_packet(
             );
 
         } else if(miparphdr->Type == MIP_ARP_TYPE_RESPONSE){
-            debugprint("received MIP ARP response: ");
+            //check if we want to send any message to this address
+            if(miphdr.src_addr == sdu->mip_addr){
+            debugprint("received MIP ARP from %d", miphdr.src_addr);
+                send_mip_packet(
+                    ifs,
+                    arp_t->sll_ifindex[index],
+                    arp_t->sll_addr[index],
+                    sdu->mip_addr,
+                    MIP_TYPE_PING,
+                    (uint8_t *)sdu->payload
+                );
+            } else {
+                debugprint("received MIP ARP from %d, which we are not interested in", miphdr.src_addr);
+            }
+
+
         } else {
             debugprint("mip arp type invalid");
             return -1;
