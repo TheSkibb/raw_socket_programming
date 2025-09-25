@@ -202,7 +202,7 @@ int main(int argc, char *argv[]){
                             arp_t.sll_addr[index],
                             sdu.mip_addr, 
                             MIP_TYPE_PING,
-                            sdu.payload);
+                            (uint8_t *)sdu.payload);
                 }
 
                 debugprint("received on unix socket: %d, \"%s\"", sdu.mip_addr, sdu.payload);
