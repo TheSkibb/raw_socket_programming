@@ -79,7 +79,7 @@ int create_unix_socket(
     return connection_socket;
 }
 
-void handle_unix_socket_message(int unix_sockfd) {
+void handle_unix_socket_message(int unix_sockfd, struct unix_sock_sdu *sdu) {
     char buffer[BUFFER_SIZE];
     memset(buffer, 0, BUFFER_SIZE); // Clear the buffer
     int data_socket;
@@ -93,7 +93,7 @@ void handle_unix_socket_message(int unix_sockfd) {
     }
 
     // Wait for next data packet from the accepted socket
-    int rc = read(data_socket, buffer, sizeof(buffer) - 1); // Leave space for null-termination
+    int rc = read(data_socket, sdu, sizeof(struct unix_sock_sdu)); // Leave space for null-termination
     if (rc == -1) {
         perror("read");
         close(data_socket); 
@@ -107,6 +107,7 @@ void handle_unix_socket_message(int unix_sockfd) {
         buffer[rc] = '\0';
         // Print the received message
         printf("Received message on Unix socket: %s\n", buffer);
+        //copy the data into the struct
     }
 
     close(data_socket);

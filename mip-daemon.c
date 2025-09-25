@@ -176,11 +176,16 @@ int main(int argc, char *argv[]){
             // Check for events on the Unix socket
             else if (events[i].data.fd == unix_sockfd) {
 
-                handle_unix_socket_message(unix_sockfd);
+                struct unix_sock_sdu sdu;
+                memset(&sdu, 0, sizeof(struct unix_sock_sdu));
+
+                handle_unix_socket_message(unix_sockfd, &sdu);
                 rc = send_mip_arp_request(
                         &interfaces, 
                         0x02
                 );
+
+                debugprint("=== received on unix socket: %d, \"%s\"", sdu.mip_addr, sdu.payload);
             }
         }
     }
