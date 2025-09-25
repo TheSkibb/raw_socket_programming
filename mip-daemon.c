@@ -163,9 +163,9 @@ int main(int argc, char *argv[]){
             exit(EXIT_FAILURE);
         }
 
-        for (int i = 0; i < rc; i++) {
+        //for (int i = 0; i < rc; i++) {
             //check for events on raw socket
-            if (events[i].data.fd == raw_sockfd) {
+            if (events->data.fd == raw_sockfd) {
                 debugprint("=received on raw socket=================================");
 
                 if(skip == 1){
@@ -184,7 +184,7 @@ int main(int argc, char *argv[]){
             }
             
             // Check for events on the Unix socket
-            else if (events[i].data.fd == unix_sockfd) {
+            else if (events->data.fd == unix_sockfd) {
                 debugprint("=received on unix socket================================");
 
                 struct unix_sock_sdu sdu;
@@ -219,7 +219,7 @@ int main(int argc, char *argv[]){
                 debugprint("received on unix socket: %d, \"%s\"", sdu.mip_addr, sdu.payload);
                 debugprint("========================================================");
             }
-        }
+        //}
     }
 	close(raw_sockfd);
     close(unix_sockfd);
