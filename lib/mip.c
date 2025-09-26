@@ -46,10 +46,10 @@ void print_mip_header(
 }
 
 int recv_mip_packet(
-        struct ifs_data *ifs,
-        struct arp_table *arp_t
+    struct ifs_data *ifs,
+    struct arp_table *arp_t,
+    struct pdu *pdu,
 ){
-    return 0;
 }
 
 int handle_mip_packet(

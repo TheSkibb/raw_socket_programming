@@ -47,10 +47,12 @@ struct mip_hdr {
     uint32_t sdu_type   : 3;
 } __attribute__((packed));
 
+//we use this struct to return all the information about a received packet from recv_mip_packet
 struct pdu {
     struct eth_hdr  ethhdr;
     struct mip_hdr  mip_hdr;
-    uint8_t         *sdu;
+    uint8_t         sdu;
+    int             interface_index;
 } __attribute__((packed));
 
 
@@ -65,16 +67,21 @@ int send_mip_packet(
     //mac address of recipient
     uint8_t *dst_mac_addr,
     //mip address of recipient
-    uint8_t dst_hip_addr,
+    uint8_t dst_mip_addr,
     //type of mip package
     uint8_t type,
     //service data unit (the actual data we are sending)
     uint8_t *sdu
 );
+int recv_mip_packet(
+    struct ifs_data *ifs,
+    struct arp_table *arp_t,
+    struct unix_sock_sdu *sdu
+);
 int handle_mip_packet(
-        struct ifs_data *ifs,
-        struct arp_table *arp_t,
-        struct unix_sock_sdu *sdu
+    struct ifs_data *ifs,
+    struct arp_table *arp_t,
+    struct unix_sock_sdu *sdu
 );
 
 //send a mip arp package
