@@ -109,6 +109,44 @@ void handle_unix_socket_message(int unix_sockfd, struct unix_sock_sdu *sdu) {
         // Print the received message
         //copy the data into the struct
     }
+
     close(data_socket);
 }
 
+int new_unix_connection(int unix_sockfd){
+    int data_socket = -1;
+    // Accept a new connection
+    data_socket = accept(unix_sockfd, NULL, NULL);
+    if (data_socket == -1) {
+        perror("accept");
+        close(data_socket); 
+        exit(EXIT_FAILURE);
+    }
+
+    return data_socket;
+}
+
+int handle_unix_connection(int data_socket, struct unix_sock_sdu *sdu){
+    char buffer[BUFFER_SIZE];
+    memset(buffer, 0, BUFFER_SIZE); // Clear the buffer
+
+    // Wait for next data packet from the accepted socket
+    int rc = read(data_socket, sdu, sizeof(struct unix_sock_sdu)); // Leave space for null-termination
+    if (rc == -1) {
+        perror("read");
+        close(data_socket); 
+        exit(EXIT_FAILURE);
+    }
+
+    // Properly handle the bytes read; ensure there's at least one byte read
+    // rc = number of bytes received from read operation
+    if (rc > 0) {
+        // Null-terminate the string
+        buffer[rc] = '\0';
+        // Print the received message
+        //copy the data into the struct
+    }
+
+    close(data_socket);
+    return rc;
+}

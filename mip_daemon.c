@@ -154,12 +154,13 @@ int main(int argc, char *argv[]){
     struct arp_table arp_t;
 
     debugprint("setup done, now entering main loop =====================\n\n\n\n");
-    int skip = 0;
 
     //global message to send
     //this way we can just check if this one is set if we receive an arp response
     struct unix_sock_sdu sdu;
     memset(&sdu, 0, sizeof(struct unix_sock_sdu));
+
+    int data_socket = -1;
 
     while (1) {
         rc = epoll_wait(efd, events, epoll_max_events, -1);
@@ -168,63 +169,46 @@ int main(int argc, char *argv[]){
             exit(EXIT_FAILURE);
         }
 
-        //for (int i = 0; i < rc; i++) {
-            //check for events on raw socket
-            if (events->data.fd == raw_sockfd) {
-                debugprint("=received on raw socket=================================");
-
-                if(skip == 1){
-                    skip = 0;
-                    continue;
-                }
-
-                rc = handle_mip_packet(&interfaces, &arp_t, &sdu);
-                if (rc < 0) {
-                    debugprint("rc == %d", rc);
-                    perror("handle_mip_packet");
-                    return 1;
-                }
-                skip = 1;
-                debugprint("===========================================end raw sock=");
+        if (events->data.fd == raw_sockfd) {
+            debugprint("=received on raw socket=================================");
+            rc = handle_mip_packet(&interfaces, &arp_t, &sdu);
+            if (rc < 0) {
+                debugprint("rc == %d", rc);
+                perror("handle_mip_packet");
+                return 1;
             }
+            debugprint("===========================================end raw sock=");
+        }
+        
+        // Check for events on the Unix socket
+        else if (events->data.fd == unix_sockfd) {
+            debugprint("=received on unix socket================================");
+
+            memset(&sdu, 0, sizeof(struct unix_sock_sdu));
             
-            // Check for events on the Unix socket
-            else if (events->data.fd == unix_sockfd) {
-                debugprint("=received on unix socket================================");
+            data_socket = new_unix_connection(unix_sockfd);
+            //add this socket to the epoll table
+            struct epoll_event event_data;
+            event_un.events = EPOLLIN; // Listen for input events
 
-                memset(&sdu, 0, sizeof(struct unix_sock_sdu));
-
-                //copies message from unix socket into sdu
-                handle_unix_socket_message(unix_sockfd, &sdu);
-
-                //check if the received mip address is in the arp table
-                int index = arp_t_get_index_from_mip_addr(&arp_t, sdu.mip_addr);
-
-                if(index == -1){
-                    debugprint("mip address %d is not in the arp table", sdu.mip_addr);
-                    rc = send_mip_arp_request(
-                            &interfaces, 
-                            sdu.mip_addr
-                    );
-                    if(rc < 0){
-                        printf("something wrong happened while sending mip arp\n");
-                        exit(EXIT_FAILURE);
-                    }
-                }else{
-                    debugprint("mip address %d IS IN the arp table NOW", arp_t.mip_addr[index]);
-                    send_mip_packet(
-                            &interfaces,
-                            arp_t.sll_ifindex[index],
-                            arp_t.sll_addr[index],
-                            sdu.mip_addr, 
-                            MIP_TYPE_PING,
-                            (uint8_t *)&sdu.payload);
-                }
-
-                debugprint("received on unix socket: %d, \"%s\"", sdu.mip_addr, sdu.payload);
-                debugprint("==========================================end unix sock=");
+            // Add the data socket to epoll
+            event_un.data.fd = data_socket;
+            if (epoll_ctl(efd, EPOLL_CTL_ADD, data_socket, &event_data) == -1) {
+                perror("epoll_ctl unix");
+                close(efd);
+                close(unix_sockfd);
+                close(raw_sockfd);
+                close(data_socket);
+                exit(EXIT_FAILURE);
             }
-        //}
+
+            debugprint("==========================================end unix sock=");
+        }else{
+            debugprint("=received on data socket================================");
+            rc = handle_unix_connection(data_socket, &sdu);
+            debugprint("received some data: %d, %s", sdu.mip_addr, sdu.payload);
+            debugprint("==========================================end data sock=");
+        }
     }
 	close(raw_sockfd);
     close(unix_sockfd);

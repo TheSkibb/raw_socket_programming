@@ -45,13 +45,6 @@ void print_mip_header(
     printf("-----------------\n");
 }
 
-int recv_mip_packet(
-    struct ifs_data *ifs,
-    struct arp_table *arp_t,
-    struct pdu *pdu,
-){
-}
-
 int handle_mip_packet(
         struct ifs_data *ifs,
         struct arp_table *arp_t,

@@ -23,5 +23,7 @@ int create_unix_socket(
     int mode
 );
 void handle_unix_socket_message(int unix_sockfd, struct unix_sock_sdu *sdu);
+int new_unix_connection(int unix_sockfd);
+int handle_unix_connection(int data_socket, struct unix_sock_sdu *sdu);
 
 #endif

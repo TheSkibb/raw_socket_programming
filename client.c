@@ -54,13 +54,22 @@ int main(int argc, char *argv[]){
        exit(EXIT_FAILURE);
     }
 
-    /* Create epoll table */
-    int epollfd = epoll_create1(0);
-    if (epollfd == -1) {
-        perror("epoll_create1");
-        return -1;
+    int r;
+    char                buffer[BUFFER_SIZE];
+
+    r = read(data_socket, buffer, sizeof(buffer));
+    if (r == -1) {
+       perror("read");
+       exit(EXIT_FAILURE);
     }
-    /* Close socket. */
+
+    /* Ensure buffer is 0-terminated. */
+
+    buffer[sizeof(buffer) - 1] = 0;
+
+    printf("Result = %s\n", buffer);
+
+
     close(data_socket);
 
     exit(EXIT_SUCCESS);

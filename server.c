@@ -7,11 +7,23 @@
 #include <sys/un.h>
 
 #include "lib/sockets.h"
-#include "lib/utils.h"
+//#include "lib/utils.h"
 
 void printHelp(){
     printf("ping_server [-h] <socket_lower>\n");
 }
+
+int create_epoll_table(){
+	/* Create epoll table */
+	int epollfd = epoll_create1(0);
+	if (epollfd == -1) {
+		perror("epoll_create1");
+		return -1;
+	}
+
+    return epollfd;
+}
+
 
 //lots of functionality here from man 7 unix
 int main(int argc, char *argv[]){
@@ -35,8 +47,6 @@ int main(int argc, char *argv[]){
 
     //TODO: change out for cmd arg
     int un_sock_fd = create_unix_socket(argv[1], UNIX_SOCKET_MODE_CLIENT);
-
-    int max_backlog = 20;
 
     struct unix_sock_sdu sdu;
     memset(&sdu, 0, sizeof(struct unix_sock_sdu));
@@ -66,18 +76,23 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
-    printf("connecting\n");
-    struct sockaddr_un server_addr;
-
-    char buffer[256];
     printf("sending empty to socket\n");
     //send an empty sdu to test connection
-    rc = send_unix_socket(un_sock_fd, &sdu);
-    ssize_t num_bytes;
+    //rc = send_unix_socket(un_sock_fd, &sdu);
+
+    int firstRound = 1;
 
     printf("starting main loop\n");
     //main listening loop
     while (1) {
+        if(firstRound ==1){
+            int ret = write(un_sock_fd, &sdu, sizeof(struct unix_sock_sdu));
+            if (ret == -1) {
+               perror("write");
+               exit(EXIT_FAILURE);
+            }
+            firstRound = 0;
+        }
         rc = epoll_wait(efd, events, epoll_max_events, -1);
         if (rc == -1) {
             perror("epoll_wait");
@@ -86,7 +101,6 @@ int main(int argc, char *argv[]){
         if(events->data.fd == un_sock_fd){
             printf("=received on unix socket================================\n");
 
-            handle_unix_socket_message(un_sock_fd, &sdu);
             printf("==========================================end unix sock=\n");
         }
     }
