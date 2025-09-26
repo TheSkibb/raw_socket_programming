@@ -24,16 +24,3 @@ int get_debug(){
     return debug;
 }
 
-// Check if there is data available to read on the socket
-//we check if data is available, because sending a packet triggers the epoll, 
-int is_data_available(int sockfd) {
-    int bytes_available = 0;
-    
-    if (ioctl(sockfd, FIONREAD, &bytes_available) < 0) {
-        perror("ioctl");
-        return -1;
-    }
-
-    return bytes_available > 0;
-}
-

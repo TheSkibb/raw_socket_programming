@@ -13,7 +13,4 @@ void set_debug(int mode);
 int get_debug();
 
 
-/*socket stuff(ish)*/
-int is_data_available(int sockfd);
-
 #endif

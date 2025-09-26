@@ -45,17 +45,18 @@ void print_mip_header(
     printf("-----------------\n");
 }
 
+int recv_mip_packet(
+        struct ifs_data *ifs,
+        struct arp_table *arp_t
+){
+    return 0;
+}
+
 int handle_mip_packet(
         struct ifs_data *ifs,
         struct arp_table *arp_t,
         struct unix_sock_sdu *sdu
     ){
-
-    //we check if data is available, because sending a packet triggers the epoll, 
-    //so there may not be data to handle
-    if(is_data_available(ifs->rsock) != 1){
-        return 0;
-    }
 
     debugprint("handling mip packet\n");
     struct sockaddr_ll so_name;
@@ -81,7 +82,7 @@ int handle_mip_packet(
 
     //read sdu
 	msgvec[2].iov_base = (void *)packet;
-	/* We can read up to 256 characters. Who cares? PONG is only 5 bytes */
+    //TODO: fix proper length
 	msgvec[2].iov_len  = 256;
 
     //fill out message metadata
@@ -163,8 +164,6 @@ int handle_mip_packet(
             } else {
                 debugprint("received MIP ARP from %d, which we are not interested in", miphdr.src_addr);
             }
-
-
         } else {
             debugprint("mip arp type invalid");
             return -1;
