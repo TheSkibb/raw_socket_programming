@@ -17,7 +17,7 @@ void printHelp(){
 //lots of functionality here from man 7 unix
 int main(int argc, char *argv[]){
 
-    set_debug(1);
+    //set_debug(1);
 
     debugprint("=checking cmd arguments=====================");
     int rc =1;
@@ -64,7 +64,7 @@ int main(int argc, char *argv[]){
 
         debugprint("=setup done, now entering main loop=========\n\n\n\n\n");
 
-        debugprint("waiting for message on unix socket");
+        printf("listening for messages on unix socket\n");
         while(1){
             rc = epoll_wait(epollfd, events, epoll_max_events, -1);
             if(rc == -1){
@@ -82,12 +82,10 @@ int main(int argc, char *argv[]){
                 debugprint("received \"%s\"", sdu.payload);
                 debugprint("received %d", sdu.mip_addr);
 
+                printf("<ping_server: \"%s\" from %u>\n", sdu.payload, sdu.mip_addr);
+
                 char pong[] = "PONG";
                 memcpy(sdu.payload, pong, 4);
-                //TODO: send back to src
-                sdu.mip_addr = 20;
-
-                debugprint("sending PONG message \"%s\"", sdu.payload);
                 
                 // Wait for next data packet from the accepted socket
                 int rc = write(socket_unix, &sdu, sizeof(struct unix_sock_sdu)); // Leave space for null-termination
