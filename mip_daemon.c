@@ -51,6 +51,8 @@ int mipd(
 
         if (events->data.fd == socket_raw) {
             debugprint("=received on raw socket=================================");
+            handle_mip_packet(interfaces, arp_t, &sdu);
+            debugprint("sdu address payload %s", sdu.payload);
             debugprint("===========================================end raw sock=");
         }
         
@@ -64,6 +66,7 @@ int mipd(
             debugprint("=handle socket data=====================================");
             debugprint("socket_data: %d", socket_data);
             handle_unix_connection(socket_data, &sdu);
+            send_mip_arp_request(interfaces, sdu.mip_addr);
             debugprint("==========================================end unix sock=");
         }
     }
