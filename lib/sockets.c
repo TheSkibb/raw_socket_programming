@@ -155,6 +155,6 @@ int handle_unix_connection(int data_socket, struct unix_sock_sdu *sdu){
         //exit(EXIT_FAILURE);
     //}
 
-    close(data_socket);
+    //close(data_socket);
     return rc;
 }

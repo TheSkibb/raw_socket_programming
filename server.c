@@ -80,6 +80,25 @@ int main(int argc, char *argv[]){
             debugprint("received %d bytes on unix socket, hurray!", rc);
             debugprint("received \"%s\"", sdu.payload);
             debugprint("received %d", sdu.mip_addr);
+
+            char pong[] = "PONG";
+            memcpy(sdu.payload, pong, 4);
+            //TODO: send back to src
+            sdu.mip_addr = 20;
+
+            debugprint("sending PONG message \"%s\"", sdu.payload);
+
+            
+            // Wait for next data packet from the accepted socket
+            int rc = write(socket_unix, &sdu, sizeof(struct unix_sock_sdu)); // Leave space for null-termination
+            if (rc == -1) {
+                perror("write");
+                close(socket_unix); 
+                exit(EXIT_FAILURE);
+            }
+
+
+
             debugprint("==========================================end unix sock=");
         }
     }
