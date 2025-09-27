@@ -10,6 +10,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <sys/epoll.h>
+#include <time.h>
 
 #include "lib/sockets.h"
 #include "lib/utils.h"
@@ -23,6 +24,8 @@ int main(int argc, char *argv[]){
     ssize_t             w;
     char socket_name[MAX_UNIX_PATH_LENGTH];
     char ping_str[] = "PING:";
+    struct timespec time_start, time_end;
+
 
     //argument handling
     if(argc > 1 && strcmp(argv[1], "-h") == 0){
@@ -52,6 +55,8 @@ int main(int argc, char *argv[]){
 
     int data_socket = create_unix_socket(socket_name, UNIX_SOCKET_MODE_CLIENT);
 
+    clock_gettime(CLOCK_MONOTONIC, &time_start);
+    
     w = write(data_socket, &sdu, sizeof(struct unix_sock_sdu));
     if (w == -1) {
        perror("write");
@@ -74,6 +79,7 @@ int main(int argc, char *argv[]){
             break;
         }else if(rc == 0){
             printf("timout\n");
+            clock_gettime(CLOCK_MONOTONIC, &time_end);
             break;
         }else if(events->data.fd == data_socket){
 
@@ -82,6 +88,7 @@ int main(int argc, char *argv[]){
                perror("read");
                exit(EXIT_FAILURE);
             }
+            clock_gettime(CLOCK_MONOTONIC, &time_end);
 
             buffer[sizeof(buffer) - 1] = 0;
 
@@ -91,6 +98,15 @@ int main(int argc, char *argv[]){
 
         }
     }
+
+    long seconds = time_end.tv_sec - time_start.tv_sec;
+    long nanoseconds = time_end.tv_nsec - time_start.tv_nsec;
+
+    // Convert nanoseconds to milliseconds
+    long milliseconds = (seconds * 1000) + (nanoseconds / 1000000);
+    
+    printf("%ld ms\n", milliseconds);
+
     close(data_socket);
 
     exit(EXIT_SUCCESS);
