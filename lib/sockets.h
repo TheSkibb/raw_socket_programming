@@ -22,8 +22,18 @@ int create_unix_socket(
     char *name, 
     int mode
 );
-void handle_unix_socket_message(int unix_sockfd, struct unix_sock_sdu *sdu);
+
+//reads content from unix_sockfd into sdu
+void handle_unix_socket_message(
+    int unix_sockfd, 
+    struct unix_sock_sdu *sdu
+);
+
+//accepts a connection on unix_sockfd
+//returns a file descriptor of the new socket
 int new_unix_connection(int unix_sockfd);
+
+//reads from data socket into
 int handle_unix_connection(int data_socket, struct unix_sock_sdu *sdu);
 
 #endif

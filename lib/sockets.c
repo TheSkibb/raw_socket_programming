@@ -25,7 +25,6 @@ int create_raw_socket(void){
 	return sd;
 }
 
-//borrowed from man 7 unix
 int create_unix_socket(
         char *socket_name,
         int mode

@@ -63,6 +63,7 @@ int mipd(
         else if (events->data.fd == socket_unix) {
             debugprint("=received on unix socket================================");
             socket_data = new_unix_connection(socket_unix);
+            //socket is in oneshot mode, because otherwise the epoll goes crazy
             add_socket_to_epoll(epollfd, socket_data, EPOLLIN | EPOLLONESHOT);
             debugprint("==========================================end unix sock=");
         }else{
@@ -74,6 +75,7 @@ int mipd(
             int index = arp_t_get_index_from_mip_addr(arp_t, sdu.mip_addr);
             if(index == -1){
                 debugprint("%d, was not in the arp table", sdu.mip_addr);
+                //the sdu will be sent when the right arp response is received in handle_mip_packet
                 send_mip_arp_request(interfaces, sdu.mip_addr);
             }else{
                 debugprint("%d, was in the arp table", sdu.mip_addr);

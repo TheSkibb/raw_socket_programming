@@ -8,15 +8,14 @@
 
 #include "lib/utils.h"
 #include "lib/sockets.h"
-//#include "lib/utils.h"
 
 void printHelp(){
     printf("ping_server [-h] <socket_lower>\n");
 }
 
-//lots of functionality here from man 7 unix
 int main(int argc, char *argv[]){
 
+    //uncomment for extra debug prints
     //set_debug(1);
 
     debugprint("=checking cmd arguments=====================");
@@ -40,9 +39,9 @@ int main(int argc, char *argv[]){
     debugprint("=======================================done=\n");
 
     debugprint("=unix socket setup==========================");
-    //ugly fix for issue where second ping would not be read by mip daemon unix socket
+
+    //while loop is an ugly fix for issue where second ping would not be read by mip daemon unix socket
     while(1){
-        //TODO: change out for cmd arg
         int socket_unix = create_unix_socket(argv[1], UNIX_SOCKET_MODE_CLIENT);
 
         debugprint("=======================================done=\n");
@@ -64,26 +63,29 @@ int main(int argc, char *argv[]){
 
         debugprint("=setup done, now entering main loop=========\n\n\n\n\n");
 
-        printf("listening for messages on unix socket\n");
+        //main listening loop
         while(1){
             rc = epoll_wait(epollfd, events, epoll_max_events, -1);
             if(rc == -1){
                 perror("epoll_wait");
                 exit(EXIT_FAILURE);
             }else if(events->data.fd == socket_unix){
+
                 debugprint("=received on unix socket================================");
-                //rc = read(socket_unix, &sdu, sizeof(struct unix_sock_sdu));
+                
                 rc = read(socket_unix, &sdu, sizeof(struct unix_sock_sdu));
                 if(rc < 0){
                     perror("recv");
                     exit(EXIT_FAILURE);
                 }
+
                 debugprint("received %d bytes on unix socket, hurray!", rc);
                 debugprint("received \"%s\"", sdu.payload);
                 debugprint("received %d", sdu.mip_addr);
 
                 printf("\"%s\" from %u>\n", sdu.payload, sdu.mip_addr);
 
+                //change out the ping for a pong, but leave the rest of the message as it is
                 char pong[] = "PONG";
                 memcpy(sdu.payload, pong, 4);
                 
@@ -94,9 +96,11 @@ int main(int argc, char *argv[]){
                     close(socket_unix); 
                     exit(EXIT_FAILURE);
                 }
-                break;
 
-                //start a new connection, since daemon is in epolloneshot mode
+                //when we are done with writing back to the unix socket, we break out of the
+                //epoll loop and create a new connection socket which we listen to.
+                //again this is an ugly workaround for a bug
+                break;
 
                 debugprint("==========================================end unix sock=");
             }

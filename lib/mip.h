@@ -59,6 +59,8 @@ struct pdu {
 /* functions */
 
 //send a mip packet
+//writes the contents of sdu to raw socket
+//returns 
 int send_mip_packet(
     //interface data
     struct ifs_data *ifs, 
@@ -73,11 +75,21 @@ int send_mip_packet(
     //service data unit (the actual data we are sending)
     uint8_t *sdu
 );
+
+
+//reads from ifs.rsock and puts the contents into the
 int recv_mip_packet(
     struct ifs_data *ifs,
     struct arp_table *arp_t,
     struct unix_sock_sdu *sdu
 );
+
+//the handle_mip_packet does different things based on the received packet
+//if MIP_TYPE_ARP && MIP_ARP_TYPE_REQUEST => save in arp cache and send_mip_arp_response
+//if MIP_TYPE_ARP && MIP_ARP_TYPE_RESPONSE => save in arp cache,
+//                  check if there is a message we want to send to this address (by checking contents of sdu)
+//                  if sdu.mip_addr == MIP_ARP_TYPE_RESPONSE.mip_addr => send_mip_packet
+//if MIP_TYPE_PING => create unix_sock_sdu and send to unix socket
 int handle_mip_packet(
     struct ifs_data *ifs,
     struct arp_table *arp_t,
@@ -86,7 +98,6 @@ int handle_mip_packet(
 );
 
 //send a mip arp package
-//sends a ethernet broadcase message
 int send_mip_arp_request(
     //interfaces
     struct ifs_data *ifs,
@@ -94,6 +105,7 @@ int send_mip_arp_request(
     uint8_t dst_mip_addr
 );
 
+//sends a mip arp response packet
 int send_mip_arp_response(
     struct ifs_data *ifs,
     int interface_index,
