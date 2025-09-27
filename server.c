@@ -40,66 +40,68 @@ int main(int argc, char *argv[]){
     debugprint("=======================================done=\n");
 
     debugprint("=unix socket setup==========================");
-
-    //TODO: change out for cmd arg
-    int socket_unix = create_unix_socket(argv[1], UNIX_SOCKET_MODE_CLIENT);
-
-    debugprint("=======================================done=\n");
-
-    debugprint("=epoll setup================================");
-
-    int epollfd = create_epoll_table();
-
-    add_socket_to_epoll(epollfd, socket_unix, EPOLLIN);
-
-    int epoll_max_events = 10;
-    struct epoll_event events[epoll_max_events];
-
-    debugprint("=======================================done=\n");
-
-
-    struct unix_sock_sdu sdu;
-    memset(&sdu, 0, sizeof(struct unix_sock_sdu));
-
-    debugprint("=setup done, now entering main loop=========\n\n\n\n\n");
-
-    debugprint("waiting for message on unix socket");
+    //ugly fix for issue where second ping would not be read by mip daemon unix socket
     while(1){
-        rc = epoll_wait(epollfd, events, epoll_max_events, -1);
-        if(rc == -1){
-            perror("epoll_wait");
-            exit(EXIT_FAILURE);
-        }else if(events->data.fd == socket_unix){
-            debugprint("=received on unix socket================================");
-            //rc = read(socket_unix, &sdu, sizeof(struct unix_sock_sdu));
-            rc = read(socket_unix, &sdu, sizeof(struct unix_sock_sdu));
-            if(rc < 0){
-                perror("recv");
+        //TODO: change out for cmd arg
+        int socket_unix = create_unix_socket(argv[1], UNIX_SOCKET_MODE_CLIENT);
+
+        debugprint("=======================================done=\n");
+
+        debugprint("=epoll setup================================");
+
+        int epollfd = create_epoll_table();
+
+        add_socket_to_epoll(epollfd, socket_unix, EPOLLIN);
+
+        int epoll_max_events = 10;
+        struct epoll_event events[epoll_max_events];
+
+        debugprint("=======================================done=\n");
+
+
+        struct unix_sock_sdu sdu;
+        memset(&sdu, 0, sizeof(struct unix_sock_sdu));
+
+        debugprint("=setup done, now entering main loop=========\n\n\n\n\n");
+
+        debugprint("waiting for message on unix socket");
+        while(1){
+            rc = epoll_wait(epollfd, events, epoll_max_events, -1);
+            if(rc == -1){
+                perror("epoll_wait");
                 exit(EXIT_FAILURE);
+            }else if(events->data.fd == socket_unix){
+                debugprint("=received on unix socket================================");
+                //rc = read(socket_unix, &sdu, sizeof(struct unix_sock_sdu));
+                rc = read(socket_unix, &sdu, sizeof(struct unix_sock_sdu));
+                if(rc < 0){
+                    perror("recv");
+                    exit(EXIT_FAILURE);
+                }
+                debugprint("received %d bytes on unix socket, hurray!", rc);
+                debugprint("received \"%s\"", sdu.payload);
+                debugprint("received %d", sdu.mip_addr);
+
+                char pong[] = "PONG";
+                memcpy(sdu.payload, pong, 4);
+                //TODO: send back to src
+                sdu.mip_addr = 20;
+
+                debugprint("sending PONG message \"%s\"", sdu.payload);
+                
+                // Wait for next data packet from the accepted socket
+                int rc = write(socket_unix, &sdu, sizeof(struct unix_sock_sdu)); // Leave space for null-termination
+                if (rc == -1) {
+                    perror("write");
+                    close(socket_unix); 
+                    exit(EXIT_FAILURE);
+                }
+                break;
+
+                //start a new connection, since daemon is in epolloneshot mode
+
+                debugprint("==========================================end unix sock=");
             }
-            debugprint("received %d bytes on unix socket, hurray!", rc);
-            debugprint("received \"%s\"", sdu.payload);
-            debugprint("received %d", sdu.mip_addr);
-
-            char pong[] = "PONG";
-            memcpy(sdu.payload, pong, 4);
-            //TODO: send back to src
-            sdu.mip_addr = 20;
-
-            debugprint("sending PONG message \"%s\"", sdu.payload);
-
-            
-            // Wait for next data packet from the accepted socket
-            int rc = write(socket_unix, &sdu, sizeof(struct unix_sock_sdu)); // Leave space for null-termination
-            if (rc == -1) {
-                perror("write");
-                close(socket_unix); 
-                exit(EXIT_FAILURE);
-            }
-
-
-
-            debugprint("==========================================end unix sock=");
         }
     }
 
