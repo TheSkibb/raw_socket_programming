@@ -46,8 +46,7 @@ int main(int argc, char *argv[]){
 
     uint8_t mip_addr = atoi(argv[3]);
 
-    printf("unix socket on %s\n", socket_name);
-    printf("sending message \"%s\"\n", sdu.payload);
+    printf("<\"%s\">\n", sdu.payload);
 
     sdu.mip_addr = mip_addr;
 
@@ -59,26 +58,39 @@ int main(int argc, char *argv[]){
        exit(EXIT_FAILURE);
     }
 
-    int r;
+    int r, rc;
     //int rc;
     char                buffer[BUFFER_SIZE];
+    int epoll_max_events = 10;
+    struct epoll_event events[epoll_max_events];
 
     int epollfd = create_epoll_table();
     add_socket_to_epoll(epollfd, data_socket, EPOLLIN);
+    while(1){
+        //timeout after 1 s = 1000ms
+        rc = epoll_wait(epollfd, events, epoll_max_events, 1000);
+        if(rc == -1){
+            perror("epoll_wait");
+            break;
+        }else if(rc == 0){
+            printf("timout\n");
+            break;
+        }else if(events->data.fd == data_socket){
+
+            r = read(data_socket, buffer, sizeof(buffer));
+            if (r == -1) {
+               perror("read");
+               exit(EXIT_FAILURE);
+            }
+
+            buffer[sizeof(buffer) - 1] = 0;
+
+            printf("<\"%s\">\n", buffer);
+            break;
 
 
-    r = read(data_socket, buffer, sizeof(buffer));
-    if (r == -1) {
-       perror("read");
-       exit(EXIT_FAILURE);
+        }
     }
-
-    /* Ensure buffer is 0-terminated. */
-
-    buffer[sizeof(buffer) - 1] = 0;
-
-    printf("Result = %s\n", buffer);
-
     close(data_socket);
 
     exit(EXIT_SUCCESS);
