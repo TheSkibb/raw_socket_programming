@@ -138,23 +138,11 @@ int handle_unix_connection(int data_socket, struct unix_sock_sdu *sdu){
         exit(EXIT_FAILURE);
     }
 
-    // Properly handle the bytes read; ensure there's at least one byte read
-    // rc = number of bytes received from read operation
+    //ensure that the string is null terminated
     if (rc > 0) {
-        // Null-terminate the string
         buffer[rc] = '\0';
-        // Print the received message
-        //copy the data into the struct
     }
-
-    //rc = write(data_socket, sdu, sizeof(struct unix_sock_sdu));
-
-    //if (rc == -1) {
-        //perror("write");
-        //close(data_socket); 
-        //exit(EXIT_FAILURE);
-    //}
-
+    //DONT close the connection!!
     //close(data_socket);
     return rc;
 }

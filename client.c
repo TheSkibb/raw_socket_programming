@@ -21,8 +21,8 @@ void printUsage(){
 //modified from man 7 unix
 int main(int argc, char *argv[]){
     ssize_t             w;
-    //char                buffer[BUFFER_SIZE];
     char socket_name[MAX_UNIX_PATH_LENGTH];
+    char ping_str[] = "PING:";
 
     //argument handling
     if(argc > 1 && strcmp(argv[1], "-h") == 0){
@@ -39,7 +39,11 @@ int main(int argc, char *argv[]){
     memset(&sdu, 0, sizeof(struct unix_sock_sdu));
 
     strncpy(socket_name, argv[1], strlen(argv[1])+1);
-    strncpy(sdu.payload, argv[2], strlen(argv[2])+1);
+
+    //strncpy(sdu.payload, argv[2], strlen(argv[2])+1);
+    strncpy(sdu.payload, ping_str, 5);
+    strncat(sdu.payload, argv[2], strlen(argv[2]));
+
     uint8_t mip_addr = atoi(argv[3]);
 
     printf("unix socket on %s\n", socket_name);

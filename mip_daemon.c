@@ -69,7 +69,24 @@ int mipd(
             debugprint("=handle socket data=====================================");
             debugprint("socket_data: %d", socket_data);
             handle_unix_connection(socket_data, &sdu);
-            send_mip_arp_request(interfaces, sdu.mip_addr);
+
+            //check mip arp table if this is in the arp table
+            int index = arp_t_get_index_from_mip_addr(arp_t, sdu.mip_addr);
+            if(index == -1){
+                debugprint("%d, was not in the arp table", sdu.mip_addr);
+                send_mip_arp_request(interfaces, sdu.mip_addr);
+            }else{
+                debugprint("%d, was in the arp table", sdu.mip_addr);
+                send_mip_packet(
+                    interfaces,
+                    arp_t->sll_ifindex[index],
+                    arp_t->sll_addr[index],
+                    sdu.mip_addr,
+                    MIP_TYPE_PING,
+                    (uint8_t *)sdu.payload
+                );
+            }
+
             debugprint("==========================================end unix sock=");
         }
     }
