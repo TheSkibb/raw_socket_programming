@@ -24,6 +24,8 @@ struct ifs_data {
 	struct sockaddr_ll addr[MAX_IF];
 	//raw socket
 	int rsock;
+    //unix socket
+    int usock;
 	//interface number (unique for each interface)
 	int ifn;
     //mip address

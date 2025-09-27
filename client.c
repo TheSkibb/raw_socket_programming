@@ -65,6 +65,7 @@ int main(int argc, char *argv[]){
 
     /* Ensure buffer is 0-terminated. */
 
+
     buffer[sizeof(buffer) - 1] = 0;
 
     printf("Result = %s\n", buffer);
