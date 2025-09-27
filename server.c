@@ -82,7 +82,7 @@ int main(int argc, char *argv[]){
                 debugprint("received \"%s\"", sdu.payload);
                 debugprint("received %d", sdu.mip_addr);
 
-                printf("<ping_server: \"%s\" from %u>\n", sdu.payload, sdu.mip_addr);
+                printf("\"%s\" from %u>\n", sdu.payload, sdu.mip_addr);
 
                 char pong[] = "PONG";
                 memcpy(sdu.payload, pong, 4);
