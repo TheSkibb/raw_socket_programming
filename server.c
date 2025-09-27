@@ -50,9 +50,9 @@ int main(int argc, char *argv[]){
 
     int epollfd = create_epoll_table();
 
-    add_socket_to_epoll(epollfd, socket_unix, EPOLLIN | EPOLLONESHOT);
+    add_socket_to_epoll(epollfd, socket_unix, EPOLLIN );
 
-    int epoll_max_events = 1;
+    int epoll_max_events = 10;
     struct epoll_event events[epoll_max_events];
 
     debugprint("=======================================done=\n");
@@ -66,15 +66,21 @@ int main(int argc, char *argv[]){
     debugprint("waiting for message on unix socket");
     while(1){
         rc = epoll_wait(epollfd, events, epoll_max_events, -1);
-        if(rc == 1){
+        if(rc == -1){
             perror("epoll_wait");
             exit(EXIT_FAILURE);
         }else if(events->data.fd == socket_unix){
-            rc = recv(socket_unix, &sdu, sizeof(struct unix_sock_sdu), 0);
+            debugprint("=received on unix socket================================");
+            //rc = read(socket_unix, &sdu, sizeof(struct unix_sock_sdu));
+            rc = read(socket_unix, &sdu, sizeof(struct unix_sock_sdu));
             if(rc < 0){
                 perror("recv");
                 exit(EXIT_FAILURE);
             }
+            debugprint("received %d bytes on unix socket, hurray!", rc);
+            debugprint("received \"%s\"", sdu.payload);
+            debugprint("received %d", sdu.payload);
+            debugprint("==========================================end unix sock=");
         }
     }
 

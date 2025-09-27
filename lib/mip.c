@@ -167,6 +167,7 @@ int handle_mip_packet(
     //send up to unix socket
     if(miphdr.sdu_type == MIP_TYPE_PING){
         debugprint("received PING message: %s", packet);
+        memcpy(sdu->payload, packet, 256);
     }
 
     return rc;

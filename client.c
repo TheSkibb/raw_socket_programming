@@ -12,6 +12,7 @@
 #include <sys/epoll.h>
 
 #include "lib/sockets.h"
+#include "lib/utils.h"
 
 void printUsage(){
     printf("ping_client [-h] <socket_lower> <message> <destination_host>\n");
@@ -55,7 +56,12 @@ int main(int argc, char *argv[]){
     }
 
     int r;
+    //int rc;
     char                buffer[BUFFER_SIZE];
+
+    int epollfd = create_epoll_table();
+    add_socket_to_epoll(epollfd, data_socket, EPOLLIN);
+
 
     r = read(data_socket, buffer, sizeof(buffer));
     if (r == -1) {
@@ -65,11 +71,9 @@ int main(int argc, char *argv[]){
 
     /* Ensure buffer is 0-terminated. */
 
-
     buffer[sizeof(buffer) - 1] = 0;
 
     printf("Result = %s\n", buffer);
-
 
     close(data_socket);
 
