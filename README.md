@@ -1,20 +1,8 @@
 # Socket programming in C
 
-## Structure
+The MIP network stack
 
-The project consists of three programs:
-
-### mipd
-
-the mip deamon takes MIP messages from a unix socket, sends/resolves MIP-ARP messages and sends MIP messages on raw sockets.
-
-### client
-
-Sends a MIP *"ping"* message
-
-### server
-
-Answers MIP *"ping"* messages with *"pong"*
+**All functions are documented in the header files.**
 
 ## Build the project
 
@@ -24,8 +12,30 @@ build all of the components with:
 make all
 ~~~
 
-build a single component with:
+This will create three files: mip_daemon, ping_client, ping_server
+
+## build a single
 
 ~~~
 make <client/server/mipd>
 ~~~
+
+## usage
+
+The daemon always needs to be started first
+~~~
+usage mipd [-h] [-d] <socket_upper> <MIP address>
+~~~
+
+then the server on some node
+
+~~~
+ping_server [-h] <socket_lower>
+~~~
+
+then you can run the client on a node
+
+~~~
+ping_client [-h] <socket_lower> <message> <destination_host>
+~~~
+
