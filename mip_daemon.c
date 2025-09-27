@@ -51,16 +51,9 @@ int mipd(
 
         if (events->data.fd == socket_raw) {
             debugprint("=received on raw socket=================================");
-            handle_mip_packet(interfaces, arp_t, &sdu);
-            
-            debugprint("trying to send \"%s\"on unix socket", sdu.payload);
-            rc = write(socket_data, (void *)&sdu, sizeof(struct unix_sock_sdu));
+            handle_mip_packet(interfaces, arp_t, &sdu, socket_data);
 
-            if (rc < 0) {
-                perror("write");
-                close(socket_data); 
-                exit(EXIT_FAILURE);
-            }
+            //create a new sdu
             debugprint("finished sending on unix socket");
 
             debugprint("===========================================end raw sock=");

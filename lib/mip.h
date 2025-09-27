@@ -81,7 +81,8 @@ int recv_mip_packet(
 int handle_mip_packet(
     struct ifs_data *ifs,
     struct arp_table *arp_t,
-    struct unix_sock_sdu *sdu
+    struct unix_sock_sdu *sdu,
+    int socket_unix
 );
 
 //send a mip arp package

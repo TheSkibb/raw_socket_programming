@@ -147,13 +147,13 @@ int handle_unix_connection(int data_socket, struct unix_sock_sdu *sdu){
         //copy the data into the struct
     }
 
-    rc = write(data_socket, sdu, sizeof(struct unix_sock_sdu));
+    //rc = write(data_socket, sdu, sizeof(struct unix_sock_sdu));
 
-    if (rc == -1) {
-        perror("write");
-        close(data_socket); 
-        exit(EXIT_FAILURE);
-    }
+    //if (rc == -1) {
+        //perror("write");
+        //close(data_socket); 
+        //exit(EXIT_FAILURE);
+    //}
 
     close(data_socket);
     return rc;

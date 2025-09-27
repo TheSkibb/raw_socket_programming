@@ -46,10 +46,11 @@ void print_mip_header(
 }
 
 int handle_mip_packet(
-        struct ifs_data *ifs,
-        struct arp_table *arp_t,
-        struct unix_sock_sdu *sdu
-    ){
+    struct ifs_data *ifs,
+    struct arp_table *arp_t,
+    struct unix_sock_sdu *sdu,
+    int socket_unix
+){
 
     debugprint("handling mip packet\n");
     struct sockaddr_ll so_name;
@@ -168,9 +169,15 @@ int handle_mip_packet(
     if(miphdr.sdu_type == MIP_TYPE_PING){
         debugprint("received PING message: %s", packet);
         memcpy(sdu->payload, packet, 256);
+        sdu->mip_addr = miphdr.src_addr;
+        int w = write(socket_unix, sdu, sizeof(struct unix_sock_sdu));
+        if (w == -1) {
+           perror("write");
+           exit(EXIT_FAILURE);
+        }
     }
 
-    return rc;
+    return miphdr.sdu_type;
 }
 
 int send_mip_packet(

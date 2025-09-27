@@ -50,7 +50,7 @@ int main(int argc, char *argv[]){
 
     int epollfd = create_epoll_table();
 
-    add_socket_to_epoll(epollfd, socket_unix, EPOLLIN );
+    add_socket_to_epoll(epollfd, socket_unix, EPOLLIN);
 
     int epoll_max_events = 10;
     struct epoll_event events[epoll_max_events];
@@ -79,7 +79,7 @@ int main(int argc, char *argv[]){
             }
             debugprint("received %d bytes on unix socket, hurray!", rc);
             debugprint("received \"%s\"", sdu.payload);
-            debugprint("received %d", sdu.payload);
+            debugprint("received %d", sdu.mip_addr);
             debugprint("==========================================end unix sock=");
         }
     }
