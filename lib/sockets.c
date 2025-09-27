@@ -105,8 +105,6 @@ void handle_unix_socket_message(int unix_sockfd, struct unix_sock_sdu *sdu) {
     if (rc > 0) {
         // Null-terminate the string
         buffer[rc] = '\0';
-        // Print the received message
-        //copy the data into the struct
     }
 
     close(data_socket);

@@ -32,6 +32,7 @@ int mipd(
     int epoll_max_events = 10;
     struct epoll_event events[epoll_max_events];
 
+    //NB: edge-cases where this is not set to a valid file descriptor
     int socket_data = -1;
 
     //set unix socket to listen
@@ -42,6 +43,7 @@ int mipd(
         exit(EXIT_FAILURE);
     }
 
+    //main loop
     while (1) {
         rc = epoll_wait(epollfd, events, epoll_max_events, -1);
         if (rc == -1) {
@@ -52,32 +54,37 @@ int mipd(
         if (events->data.fd == socket_raw) {
             debugprint("=received on raw socket=================================");
             handle_mip_packet(interfaces, arp_t, &sdu, socket_data);
-
-            //create a new sdu
-            debugprint("finished sending on unix socket");
-
             debugprint("===========================================end raw sock=");
         }
         
         // Check for events on the Unix socket
         else if (events->data.fd == socket_unix) {
             debugprint("=received on unix socket================================");
+            //someone has connected to the unix socket
+            //NB: reassigns socket_data
             socket_data = new_unix_connection(socket_unix);
-            //socket is in oneshot mode, because otherwise the epoll goes crazy
+            //NB: socket is in oneshot mode, because otherwise the epoll goes crazy
             add_socket_to_epoll(epollfd, socket_data, EPOLLIN | EPOLLONESHOT);
             debugprint("==========================================end unix sock=");
         }else{
             debugprint("=handle socket data=====================================");
             debugprint("socket_data: %d", socket_data);
+
+            //put data from unix socket into sdu
+            //NB: closes socket_data
             handle_unix_connection(socket_data, &sdu);
+            
+            //TODO: check if any data was actually received
 
             //check mip arp table if this is in the arp table
             int index = arp_t_get_index_from_mip_addr(arp_t, sdu.mip_addr);
             if(index == -1){
                 debugprint("%d, was not in the arp table", sdu.mip_addr);
+                //we dont know what interface and mac address to send the packet to, so we need to run a mip-arp request
                 //the sdu will be sent when the right arp response is received in handle_mip_packet
                 send_mip_arp_request(interfaces, sdu.mip_addr);
             }else{
+                //we know what interface and mac address is associated with the mip address, so we can send it right away
                 debugprint("%d, was in the arp table", sdu.mip_addr);
                 send_mip_packet(
                     interfaces,

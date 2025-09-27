@@ -6,11 +6,10 @@
 //#include "mip.h"
 
 //structure for storing mip addresses and the corresponding interface to send
-
 struct arp_table {
-    //
+    //mip address
     uint8_t mip_addr[3];
-    //interface number (when using the ifs_data s)
+    //interface number (in ifs_data.addr)
     int sll_ifindex[3];
     //mac address
     uint8_t sll_addr[3][6];

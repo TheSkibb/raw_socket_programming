@@ -38,14 +38,12 @@ int create_epoll_table(){
     return epollfd;
 }
 
-int add_socket_to_epoll(int epollfd, int socket, int flags){
+void add_socket_to_epoll(int epollfd, int socket, int flags){
     struct epoll_event events;
     events.events = flags;
     events.data.fd = socket;
     if(epoll_ctl(epollfd, EPOLL_CTL_ADD, socket, &events) == -1){
         exit(EXIT_FAILURE);
     }
-
-    return 0;
 }
 

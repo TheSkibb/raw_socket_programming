@@ -85,11 +85,11 @@ int recv_mip_packet(
 );
 
 //the handle_mip_packet does different things based on the received packet
-//if MIP_TYPE_ARP && MIP_ARP_TYPE_REQUEST => save in arp cache and send_mip_arp_response
-//if MIP_TYPE_ARP && MIP_ARP_TYPE_RESPONSE => save in arp cache,
+//if MIP_TYPE_ARP && MIP_ARP_TYPE_REQUEST -> save in arp cache and send_mip_arp_response
+//if MIP_TYPE_ARP && MIP_ARP_TYPE_RESPONSE -> save in arp cache,
 //                  check if there is a message we want to send to this address (by checking contents of sdu)
-//                  if sdu.mip_addr == MIP_ARP_TYPE_RESPONSE.mip_addr => send_mip_packet
-//if MIP_TYPE_PING => create unix_sock_sdu and send to unix socket
+//                  if sdu.mip_addr == MIP_ARP_TYPE_RESPONSE.mip_addr -> send_mip_packet
+//if MIP_TYPE_PING -> create unix_sock_sdu and send to unix socket
 int handle_mip_packet(
     struct ifs_data *ifs,
     struct arp_table *arp_t,
