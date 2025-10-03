@@ -26,4 +26,4 @@ router:
 	$(ROUTER)
 
 clean:
-	rm -f $(DIR)*
+	find $(DIR) -type f -executable -delete 
