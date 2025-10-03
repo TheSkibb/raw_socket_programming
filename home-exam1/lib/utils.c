@@ -17,6 +17,7 @@ int debugprint(const char *format, ...) {
     return 0;
 }
 
+//sets debug mode
 void set_debug(int mode){
     debug = mode;
 }

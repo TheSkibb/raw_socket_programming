@@ -7,6 +7,7 @@
 //takes in format string and arguments
 //NOTICE: adds \n to end of string
 int debugprint(const char *format, ...);
+
 //sets the global debug flag 
 //1 = debug on
 //0 = debug off
