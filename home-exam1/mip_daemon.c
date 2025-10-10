@@ -64,7 +64,7 @@ int mipd(
             //NB: reassigns socket_data
             socket_data = new_unix_connection(socket_unix);
             //NB: socket is in oneshot mode, because otherwise the epoll goes crazy
-            add_socket_to_epoll(epollfd, socket_data, EPOLLIN | EPOLLONESHOT);
+            add_socket_to_epoll(epollfd, socket_data, EPOLLIN );
             debugprint("==========================================end unix sock=");
         }else{
             debugprint("=handle socket data=====================================");
@@ -76,6 +76,7 @@ int mipd(
 
             //if no data was received on connection, dont do anything
             if(rc == 0){
+                close(socket_data);
                 continue;
             }
             
