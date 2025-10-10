@@ -51,10 +51,9 @@ struct mip_hdr {
 struct pdu {
     struct eth_hdr  ethhdr;
     struct mip_hdr  mip_hdr;
-    uint8_t         sdu;
+    uint8_t         sdu[256];
     int             interface_index;
 } __attribute__((packed));
-
 
 /* functions */
 
@@ -78,11 +77,13 @@ int send_mip_packet(
 
 
 //reads from ifs.rsock and puts the contents into the
+/*
 int recv_mip_packet(
     struct ifs_data *ifs,
     struct arp_table *arp_t,
     struct unix_sock_sdu *sdu
 );
+*/
 
 //the handle_mip_packet does different things based on the received packet
 //if MIP_TYPE_ARP && MIP_ARP_TYPE_REQUEST -> save in arp cache and send_mip_arp_response
