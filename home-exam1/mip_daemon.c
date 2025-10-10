@@ -59,7 +59,7 @@ int mipd(
         
         // Check for events on the Unix socket
         else if (events->data.fd == socket_unix) {
-            debugprint("=received on unix socket================================");
+            debugprint("=New unix socket connection==========================");
             //someone has connected to the unix socket
             //NB: reassigns socket_data
             socket_data = new_unix_connection(socket_unix);
@@ -72,10 +72,13 @@ int mipd(
 
             //put data from unix socket into sdu
             //NB: closes socket_data
-            handle_unix_connection(socket_data, &sdu);
-            
-            //TODO: check if any data was actually received
+            rc = handle_unix_connection(socket_data, &sdu);
 
+            //if no data was received on connection, dont do anything
+            if(rc == 0){
+                continue;
+            }
+            
             //check mip arp table if this is in the arp table
             int index = arp_t_get_index_from_mip_addr(arp_t, sdu.mip_addr);
             if(index == -1){

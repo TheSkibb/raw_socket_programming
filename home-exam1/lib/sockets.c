@@ -106,8 +106,6 @@ void handle_unix_socket_message(int unix_sockfd, struct unix_sock_sdu *sdu) {
         // Null-terminate the string
         buffer[rc] = '\0';
     }
-
-    close(data_socket);
 }
 
 int new_unix_connection(int unix_sockfd){

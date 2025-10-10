@@ -40,7 +40,8 @@ void handle_unix_socket_message(
 //returns a file descriptor of the new socket
 int new_unix_connection(int unix_sockfd);
 
-//reads from data socket into
+//reads from data socket into sdu
+//returns the return code from the read operation
 int handle_unix_connection(int data_socket, struct unix_sock_sdu *sdu);
 
 #endif
