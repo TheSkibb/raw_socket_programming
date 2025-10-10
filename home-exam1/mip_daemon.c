@@ -74,8 +74,9 @@ int mipd(
             //NB: closes socket_data
             rc = handle_unix_connection(socket_data, &sdu);
 
-            //if no data was received on connection, dont do anything
+            //if no data was received on connection, the socket was closed on the client side
             if(rc == 0){
+                debugprint("=====================================data socket closed=");
                 close(socket_data);
                 continue;
             }
