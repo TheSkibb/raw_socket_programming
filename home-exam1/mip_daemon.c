@@ -53,7 +53,20 @@ int mipd(
 
         if (events->data.fd == socket_raw) {
             debugprint("=received on raw socket=================================");
-            handle_mip_packet(interfaces, arp_t, &sdu, socket_data);
+            struct pdu mip_pdu;
+            memset(&mip_pdu, 0, sizeof(struct pdu));
+
+            int received_index = -1;
+
+            recv_mip_packet(
+                interfaces,
+                arp_t,
+                &sdu,
+                socket_unix,
+                &mip_pdu,
+                &received_index
+            );
+            handle_mip_packet(interfaces, arp_t, &sdu, socket_data, &mip_pdu, received_index);
             debugprint("===========================================end raw sock=");
         }
         

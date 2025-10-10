@@ -111,104 +111,33 @@ int recv_mip_packet(
     memcpy(out_pdu->sdu, &packet, 256);
     memcpy(&out_pdu->mip_hdr, &miphdr, sizeof(struct mip_hdr));
     memcpy(&out_pdu->ethhdr, &ethhdr, sizeof(struct eth_hdr));
-    out_pdu->interface_index = received_index;
     *out_received_index = received_index;
 
     return 0;
 }
 
 int handle_mip_packet(
-    struct ifs_data *ifs,
-    struct arp_table *arp_t,
-    struct unix_sock_sdu *sdu,
-    int socket_unix
+        struct ifs_data *ifs,
+        struct arp_table *arp_t,
+        struct unix_sock_sdu *sdu,
+        int socket_unix,
+        struct pdu *mip_pdu,
+        int received_index
 ){
-    /*
-    debugprint("handling mip packet\n");
-    struct sockaddr_ll so_name;
-    struct eth_hdr ethhdr;
-    struct mip_hdr miphdr;
-
-    struct msghdr msg;
-
-    int iov_len = 3;
-    struct iovec msgvec[iov_len];
-    int rc;
-
-    //we put the contents of the packet into this variable
-    uint8_t packet[256];
-
-    //point to eth hdr
-    msgvec[0].iov_base = &ethhdr;
-    msgvec[0].iov_len = sizeof(struct eth_hdr);
-
-    //point to mip header
-    msgvec[1].iov_base = &miphdr;
-    msgvec[1].iov_len = sizeof(struct mip_hdr);
-
-    //read sdu
-	msgvec[2].iov_base = (void *)packet;
-    //TODO: fix proper length
-	msgvec[2].iov_len  = 256;
-
-    //fill out message metadata
-    msg.msg_name = &so_name;
-    msg.msg_namelen = sizeof(struct sockaddr_ll);
-    msg.msg_iovlen = iov_len;
-    msg.msg_iov = msgvec;
-
-    debugprint("i want to receive message");
-    rc = recvmsg(ifs->rsock, &msg, 0);
-    if(rc <= 0){
-        perror("recvmsg");
-        return -1;
-    }
-
-    //find out what interface we received data on
-    int received_index = -1;
-
-    for(int i = 0; i < MAX_IF; i++){
-        if(ifs->addr[i].sll_ifindex == so_name.sll_ifindex){
-            received_index = i;
-        }
-    }
-
-    if(received_index == -1){
-        printf("could not find out what interface we received data on");
-        exit(EXIT_FAILURE);
-    }
-    */
-
-    struct pdu mip_pdu;
-    memset(&mip_pdu, 0, sizeof(struct pdu));
-
-    int received_index = -1;
-
-    recv_mip_packet(
-        ifs,
-        arp_t,
-        sdu,
-        socket_unix,
-        &mip_pdu,
-        &received_index
-    );
-
-    debugprint("received_index %d = pdu.interface", received_index, mip_pdu.interface_index);
-
 
     //mip arp handling
-    if(mip_pdu.mip_hdr.sdu_type == MIP_TYPE_ARP){
+    if(mip_pdu->mip_hdr.sdu_type == MIP_TYPE_ARP){
         debugprint("type is MIP arp");
-        struct mip_arp_hdr *miparphdr = (struct mip_arp_hdr *)&mip_pdu.sdu;
+        struct mip_arp_hdr *miparphdr = (struct mip_arp_hdr *)&mip_pdu->sdu;
 
         //check if this address already is in our mip cache
-        int index = arp_t_get_index_from_mip_addr(arp_t, mip_pdu.mip_hdr.src_addr);
+        int index = arp_t_get_index_from_mip_addr(arp_t, mip_pdu->mip_hdr.src_addr);
 
         debugprint("index from table: %d", index);
 
         if(index == -1){
             debugprint("address was not found in table");
-            index = arp_t_add_entry(arp_t, mip_pdu.mip_hdr.src_addr, received_index, mip_pdu.ethhdr.src_mac);
+            index = arp_t_add_entry(arp_t, mip_pdu->mip_hdr.src_addr, received_index, mip_pdu->ethhdr.src_mac);
             if(index == -1){
                 printf("not enough space in arp table\n");
                 exit(EXIT_FAILURE);
@@ -227,14 +156,14 @@ int handle_mip_packet(
             send_mip_arp_response(
                 ifs, 
                 received_index, 
-                mip_pdu.ethhdr.src_mac, 
-                mip_pdu.mip_hdr.dst_addr
+                mip_pdu->ethhdr.src_mac, 
+                mip_pdu->mip_hdr.dst_addr
             );
 
         } else if(miparphdr->Type == MIP_ARP_TYPE_RESPONSE){
             //check if we want to send any message to this address
-            if(mip_pdu.mip_hdr.src_addr == sdu->mip_addr){
-            debugprint("received MIP ARP from %d", mip_pdu.mip_hdr.src_addr);
+            if(mip_pdu->mip_hdr.src_addr == sdu->mip_addr){
+            debugprint("received MIP ARP from %d", mip_pdu->mip_hdr.src_addr);
                 send_mip_packet(
                     ifs,
                     arp_t->sll_ifindex[index],
@@ -244,7 +173,7 @@ int handle_mip_packet(
                     (uint8_t *)sdu->payload
                 );
             } else {
-                debugprint("received MIP ARP from %d, which we are not interested in", mip_pdu.mip_hdr.src_addr);
+                debugprint("received MIP ARP from %d, which we are not interested in", mip_pdu->mip_hdr.src_addr);
             }
         } else {
             debugprint("mip arp type invalid");
@@ -254,10 +183,10 @@ int handle_mip_packet(
     }
 
     //send up to unix socket
-    if(mip_pdu.mip_hdr.sdu_type == MIP_TYPE_PING){
-        debugprint("received PING message: %s", mip_pdu.sdu);
-        memcpy(sdu->payload, mip_pdu.sdu, 256);
-        sdu->mip_addr = mip_pdu.mip_hdr.src_addr;
+    if(mip_pdu->mip_hdr.sdu_type == MIP_TYPE_PING){
+        debugprint("received PING message: %s", mip_pdu->sdu);
+        memcpy(sdu->payload, mip_pdu->sdu, 256);
+        sdu->mip_addr = mip_pdu->mip_hdr.src_addr;
         int w = 0;
         if(socket_unix != -1){
             w = write(socket_unix, sdu, sizeof(struct unix_sock_sdu));
@@ -270,7 +199,7 @@ int handle_mip_packet(
         }
     }
 
-    return mip_pdu.mip_hdr.sdu_type;
+    return mip_pdu->mip_hdr.sdu_type;
 }
 
 int send_mip_packet(
