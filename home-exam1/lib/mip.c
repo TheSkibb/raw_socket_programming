@@ -170,8 +170,11 @@ int handle_mip_packet(
         debugprint("received PING message: %s", packet);
         memcpy(sdu->payload, packet, 256);
         sdu->mip_addr = miphdr.src_addr;
-        int w = write(socket_unix, sdu, sizeof(struct unix_sock_sdu));
-        if (w == -1) {
+        int w = 0;
+        if(socket_unix != -1){
+            w = write(socket_unix, sdu, sizeof(struct unix_sock_sdu));
+        }
+        if (w == -1 || w == 0) {
            perror("write");
            exit(EXIT_FAILURE);
         }
