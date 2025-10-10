@@ -19,7 +19,7 @@ void printUsage(){
     printf("ping_client [-h] <socket_lower> <message> <destination_host>\n");
 }
 
-//modified from man 7 unix
+//modified client.c from man 7 unix
 int main(int argc, char *argv[]){
     ssize_t             w;
     char socket_name[MAX_UNIX_PATH_LENGTH];
@@ -38,12 +38,11 @@ int main(int argc, char *argv[]){
         printUsage();
         return 0;
     }
+
     struct unix_sock_sdu sdu;
     memset(&sdu, 0, sizeof(struct unix_sock_sdu));
 
-    strncpy(socket_name, argv[1], strlen(argv[1])+1);
-
-    //strncpy(sdu.payload, argv[2], strlen(argv[2])+1);
+    //concatinate "PING: with the cmd argument"
     strncpy(sdu.payload, ping_str, 5);
     strncat(sdu.payload, argv[2], strlen(argv[2]));
 
@@ -53,24 +52,30 @@ int main(int argc, char *argv[]){
 
     sdu.mip_addr = mip_addr;
 
+    //unix socket setup
+    strncpy(socket_name, argv[1], strlen(argv[1])+1);
     int data_socket = create_unix_socket(socket_name, UNIX_SOCKET_MODE_CLIENT);
 
+    //start time
     clock_gettime(CLOCK_MONOTONIC, &time_start);
     
+    //send the data
     w = write(data_socket, &sdu, sizeof(struct unix_sock_sdu));
     if (w == -1) {
        perror("write");
        exit(EXIT_FAILURE);
     }
 
-    int r, rc;
-    //int rc;
+    //epoll setup
+    int                 r, rc;
     char                buffer[BUFFER_SIZE];
-    int epoll_max_events = 10;
-    struct epoll_event events[epoll_max_events];
+    int                 epoll_max_events = 10;
+    struct epoll_event  events[epoll_max_events];
 
     int epollfd = create_epoll_table();
     add_socket_to_epoll(epollfd, data_socket, EPOLLIN);
+
+    //wait for response from daemon
     while(1){
         //timeout after 1 s = 1000ms
         rc = epoll_wait(epollfd, events, epoll_max_events, 1000);
@@ -97,6 +102,7 @@ int main(int argc, char *argv[]){
         }
     }
 
+    //get time difference from start to end
     long seconds = time_end.tv_sec - time_start.tv_sec;
     long nanoseconds = time_end.tv_nsec - time_start.tv_nsec;
 
