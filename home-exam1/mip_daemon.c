@@ -76,7 +76,6 @@ int mipd(
             //someone has connected to the unix socket
             //NB: reassigns socket_data
             socket_data = new_unix_connection(socket_unix);
-            //NB: socket is in oneshot mode, because otherwise the epoll goes crazy
             add_socket_to_epoll(epollfd, socket_data, EPOLLIN );
             debugprint("==========================================end unix sock=");
         }else{
@@ -84,7 +83,6 @@ int mipd(
             debugprint("socket_data: %d", socket_data);
 
             //put data from unix socket into sdu
-            //NB: closes socket_data
             rc = handle_unix_connection(socket_data, &sdu);
 
             //if no data was received on connection, the socket was closed on the client side
