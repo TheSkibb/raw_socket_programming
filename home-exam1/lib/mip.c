@@ -111,6 +111,7 @@ int recv_mip_packet(
     memcpy(out_pdu->sdu, &packet, 256);
     memcpy(&out_pdu->mip_hdr, &miphdr, sizeof(struct mip_hdr));
     memcpy(&out_pdu->ethhdr, &ethhdr, sizeof(struct eth_hdr));
+    out_pdu->interface_index = received_index;
     *out_received_index = received_index;
 
     return 0;
@@ -192,12 +193,7 @@ int handle_mip_packet(
         &received_index
     );
 
-    debugprint("pdu contents:");
-    print_mip_header(&mip_pdu.mip_hdr);
-    if(mip_pdu.mip_hdr.sdu_type == MIP_TYPE_ARP){
-        print_mip_arp_header((struct mip_arp_hdr *)mip_pdu.sdu);
-    }
-
+    debugprint("received_index %d = pdu.interface", received_index, mip_pdu.interface_index);
 
 
     //mip arp handling
