@@ -173,8 +173,10 @@ int handle_mip_packet(
         int w = 0;
         if(socket_unix != -1){
             w = write(socket_unix, sdu, sizeof(struct unix_sock_sdu));
+        }else{
+            debugprint("socket_data is -1, no server is connected");
         }
-        if (w == -1 || w == 0) {
+        if (w == -1) {
            perror("write");
            exit(EXIT_FAILURE);
         }
