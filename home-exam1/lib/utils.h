@@ -17,7 +17,8 @@ int get_debug();
 //returns a file descriptor for a newly created epoll table
 int create_epoll_table();
 
-//adds a socket to the epoll table
+//adds a socket file descriptor to the epoll table
+//(name is a little misleading, you can add any file descriptor to the epoll table with this function)
 void add_socket_to_epoll(
     //epoll table file descriptor
     int epollfd, 
