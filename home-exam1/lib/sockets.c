@@ -102,7 +102,7 @@ int new_unix_connection(int unix_sockfd){
     return data_socket;
 }
 
-int handle_unix_connection(int data_socket, struct unix_sock_sdu *sdu){
+int recv_unix_connection(int data_socket, struct unix_sock_sdu *sdu){
     // Wait for next data packet from the accepted socket
     int rc = read(data_socket, sdu, sizeof(struct unix_sock_sdu)); // Leave space for null-termination
     if (rc == -1) {

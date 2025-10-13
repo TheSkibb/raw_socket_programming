@@ -37,15 +37,6 @@
 //   <next hop MIP address (8 bits)>
 #define ROUTING_RESPONSE_MSG {0x52, 0x53, 0x50, 0xFF} //RSP<mip address>
 
-struct routing_update_msg{
-    uint8_t                 host_mip_addr;
-    uint8_t                 TTL;
-    uint8_t                 U;
-    uint8_t                 P;
-    uint8_t                 D;
-    struct  forward_table   ft;
-} __attribute__((packed));
-
 // FSM States
 typedef enum {
 	INIT,

@@ -34,6 +34,8 @@ int mipd(
 
     //NB: edge-cases where this is not set to a valid file descriptor
     int socket_data = -1;
+    int socket_routing = -1;
+    int socket_application = -1;
 
     //set unix socket to listen
     int max_backlog = 10;
@@ -78,6 +80,8 @@ int mipd(
             //someone has connected to the unix socket
             //NB: reassigns socket_data
             socket_data = new_unix_connection(socket_unix);
+
+            //get identifier
             uint8_t identifier = -1;
             int rc = read(socket_data, &identifier, sizeof(uint8_t)); // Leave space for null-termination
             if (rc == -1) {
@@ -85,20 +89,27 @@ int mipd(
                 close(socket_data); 
                 exit(EXIT_FAILURE);
             }
+
+            if(identifier == SOCKET_TYPE_CLIENT || identifier == SOCKET_TYPE_SERVER){
+                socket_application = socket_data;
+            }else if(identifier == SOCKET_TYPE_ROUTER){
+                socket_routing = socket_data;
+            }
             debugprint("the socket is of type: %d", identifier);
+
+
             add_socket_to_epoll(epollfd, socket_data, EPOLLIN );
             debugprint("==========================================end unix sock=");
-        }else{
-            debugprint("=handle socket data=====================================");
-            debugprint("socket_data: %d", socket_data);
+        }else if(events->data.fd == socket_application){
+            debugprint("=handle application socket==============================");
+            debugprint("socket_application: %d", socket_application);
 
             //put data from unix socket into sdu
-            rc = handle_unix_connection(socket_data, &sdu);
-
+            rc = recv_unix_connection(socket_application, &sdu);
             //if no data was received on connection, the socket was closed on the client side
             if(rc == 0){
-                debugprint("=====================================data socket closed=");
-                close(socket_data);
+                debugprint("========================================= socket closed=");
+                close(socket_application);
                 continue;
             }
             
@@ -124,6 +135,24 @@ int mipd(
             }
 
             debugprint("==========================================end unix sock=");
+        }else if(events->data.fd == socket_routing){
+            debugprint("=Handle router socket===================================");
+            struct unix_sock_sdu router_sdu;
+            //put data from unix socket into sdu
+            rc = recv_unix_connection(socket_routing, &router_sdu);
+            //if no data was received on connection, the socket was closed on the client side
+            if(rc == 0){
+                debugprint("========================================= socket closed=");
+                close(socket_routing);
+                continue;
+            }
+
+
+            if(strncmp(router_sdu.payload, "HEL", 3) == 0){
+                debugprint("received HELLO message from router socket");
+            }
+
+            debugprint("======================================router sock handled");
         }
     }
 	close(interfaces->rsock);

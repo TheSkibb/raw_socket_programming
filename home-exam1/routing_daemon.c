@@ -9,6 +9,7 @@
 #include "lib/utils.h"
 #include "lib/sockets.h"
 #include "lib/utils.h"
+#include "lib/routing.h"
 
 void print_usage(){
     printf("./routing_daemon <socket_lower>\n");
@@ -78,6 +79,7 @@ int main(int argc, char *argv[]){
             perror("epoll_wait");
             exit(EXIT_FAILURE);
         }else if(events->data.fd == timerfd){
+            debugprint("=Sending hello message========================");
             //read the timer file descriptor to remove the event from epoll
             ssize_t s = read(timerfd, &missed, sizeof(uint64_t));
             if(s != sizeof(uint64_t)){
@@ -87,15 +89,17 @@ int main(int argc, char *argv[]){
 
             //every 30 seconds check send update message
 
-            /*
+
             struct unix_sock_sdu message;
             memset(&message, 0, sizeof(message));
 
-            message.mip_addr = 0xFU;
+            uint8_t msg[] = ROUTING_HELLO_MSG; //HEL
+            memcpy(message.payload, msg, sizeof(msg));
+
+            message.mip_addr = 0x00;
 
             send(socket_unix, &message, sizeof(message), 0);
-            */
-
+            debugprint("=======================================done=\n");
 
         }else if(events->data.fd == socket_unix){
             //do some stuff

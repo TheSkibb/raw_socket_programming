@@ -252,7 +252,7 @@ int handle_mip_ping_packet(
         if(socket_unix != -1){
             w = write(socket_unix, sdu, sizeof(struct unix_sock_sdu));
         }else{
-            debugprint("socket_data is -1, no server is connected");
+            debugprint("socket_data is -1, no application is connected");
         }
         if (w == -1) {
            perror("write");

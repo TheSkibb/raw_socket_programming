@@ -49,7 +49,7 @@ int new_unix_connection(int unix_sockfd);
 
 //reads from data socket into sdu
 //returns the return code from the read operation
-int handle_unix_connection(
+int recv_unix_connection(
     int data_socket, 
     struct unix_sock_sdu *sdu
 );
