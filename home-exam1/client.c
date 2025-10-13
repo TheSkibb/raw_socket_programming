@@ -54,7 +54,7 @@ int main(int argc, char *argv[]){
 
     //unix socket setup
     strncpy(socket_name, argv[1], strlen(argv[1])+1);
-    int data_socket = create_unix_socket(socket_name, UNIX_SOCKET_MODE_CLIENT);
+    int data_socket = create_unix_socket(socket_name, UNIX_SOCKET_MODE_CLIENT, SOCKET_TYPE_CLIENT);
 
     //start time
     clock_gettime(CLOCK_MONOTONIC, &time_start);
@@ -68,7 +68,6 @@ int main(int argc, char *argv[]){
 
     //epoll setup
     int                 r, rc;
-    char                buffer[BUFFER_SIZE];
     int                 epoll_max_events = 10;
     struct epoll_event  events[epoll_max_events];
 
@@ -88,16 +87,17 @@ int main(int argc, char *argv[]){
             break;
         }else if(events->data.fd == data_socket){
 
-            r = read(data_socket, buffer, sizeof(buffer));
+            struct unix_sock_sdu recv_sdu;
+            memset(&recv_sdu, 0, sizeof(struct unix_sock_sdu));
+
+            r = read(data_socket, (void *)&recv_sdu, sizeof(struct unix_sock_sdu));
             if (r == -1) {
                perror("read");
                exit(EXIT_FAILURE);
             }
             clock_gettime(CLOCK_MONOTONIC, &time_end);
 
-            buffer[sizeof(buffer) - 1] = 0;
-
-            printf("<\"%s\">\n", buffer);
+            printf("<\"%s\">\n", recv_sdu.payload);
             break;
         }
     }

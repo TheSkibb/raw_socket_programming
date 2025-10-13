@@ -40,7 +40,7 @@ int main(int argc, char *argv[]){
 
     debugprint("=unix socket setup==========================");
 
-    int socket_unix = create_unix_socket(argv[1], UNIX_SOCKET_MODE_CLIENT);
+    int socket_unix = create_unix_socket(argv[1], UNIX_SOCKET_MODE_CLIENT, SOCKET_TYPE_SERVER);
 
     debugprint("=======================================done=\n");
 

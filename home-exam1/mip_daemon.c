@@ -66,6 +66,8 @@ int mipd(
                 &mip_pdu,
                 &received_index
             );
+
+            debugprint("attempting to handle on unix socket");
             handle_mip_packet(interfaces, arp_t, &sdu, socket_data, &mip_pdu, received_index);
             debugprint("===========================================end raw sock=");
         }
@@ -76,6 +78,14 @@ int mipd(
             //someone has connected to the unix socket
             //NB: reassigns socket_data
             socket_data = new_unix_connection(socket_unix);
+            uint8_t identifier = -1;
+            int rc = read(socket_data, &identifier, sizeof(uint8_t)); // Leave space for null-termination
+            if (rc == -1) {
+                perror("read");
+                close(socket_data); 
+                exit(EXIT_FAILURE);
+            }
+            debugprint("the socket is of type: %d", identifier);
             add_socket_to_epoll(epollfd, socket_data, EPOLLIN );
             debugprint("==========================================end unix sock=");
         }else{
@@ -106,6 +116,7 @@ int mipd(
                     interfaces,
                     arp_t->sll_ifindex[index],
                     arp_t->sll_addr[index],
+                    interfaces->mip_addr,
                     sdu.mip_addr,
                     MIP_TYPE_PING,
                     (uint8_t *)sdu.payload
@@ -159,7 +170,7 @@ int main(int argc, char *argv[]){
 
     debugprint("=initialize unix socket=====================");
 
-    int socket_unix = create_unix_socket(unixSocketName, UNIX_SOCKET_MODE_SERVER);
+    int socket_unix = create_unix_socket(unixSocketName, UNIX_SOCKET_MODE_SERVER, 0);
 
     debugprint("=======================================done=");
 
@@ -197,5 +208,4 @@ int main(int argc, char *argv[]){
         socket_raw,
         socket_unix
     );
-
 }

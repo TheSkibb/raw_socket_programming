@@ -32,14 +32,11 @@ int main(int argc, char *argv[]){
 
     debugprint("=unix socket setup==========================");
 
-    int socket_unix = create_unix_socket(socket_unix_name, UNIX_SOCKET_MODE_CLIENT);
+    int socket_unix = create_unix_socket(socket_unix_name, UNIX_SOCKET_MODE_CLIENT, SOCKET_TYPE_ROUTER);
 
     debugprint("=======================================done=\n");
 
     debugprint("timer socket setup==========================");
-    
-    //timer file descriptor
-    //
 
     // Create the timerfd
     int timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
@@ -81,14 +78,25 @@ int main(int argc, char *argv[]){
             perror("epoll_wait");
             exit(EXIT_FAILURE);
         }else if(events->data.fd == timerfd){
+            //read the timer file descriptor to remove the event from epoll
             ssize_t s = read(timerfd, &missed, sizeof(uint64_t));
             if(s != sizeof(uint64_t)){
                 perror("read");
                 exit(EXIT_FAILURE);
             }
 
-            const char *message = "Hello unix socket";
-            send(socket_unix, message, strlen(message), 0);
+            //every 30 seconds check send update message
+
+            /*
+            struct unix_sock_sdu message;
+            memset(&message, 0, sizeof(message));
+
+            message.mip_addr = 0xFU;
+
+            send(socket_unix, &message, sizeof(message), 0);
+            */
+
+
         }else if(events->data.fd == socket_unix){
             //do some stuff
         }
