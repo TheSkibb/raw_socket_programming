@@ -122,9 +122,6 @@ int new_unix_connection(int unix_sockfd){
 }
 
 int handle_unix_connection(int data_socket, struct unix_sock_sdu *sdu){
-    char buffer[BUFFER_SIZE];
-    memset(buffer, 0, BUFFER_SIZE); // Clear the buffer
-
     // Wait for next data packet from the accepted socket
     int rc = read(data_socket, sdu, sizeof(struct unix_sock_sdu)); // Leave space for null-termination
     if (rc == -1) {
@@ -132,12 +129,5 @@ int handle_unix_connection(int data_socket, struct unix_sock_sdu *sdu){
         close(data_socket); 
         exit(EXIT_FAILURE);
     }
-
-    //ensure that the string is null terminated
-    if (rc > 0) {
-        buffer[rc] = '\0';
-    }
-    //DONT close the connection!!
-    //close(data_socket);
     return rc;
 }
