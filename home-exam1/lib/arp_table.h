@@ -4,15 +4,18 @@
 #include <stdint.h>
 
 //#include "mip.h"
+//
+#define MAX_MIP_NODES 5
+#define MAC_ADDRESS_LENGTH 6
 
 //structure for storing mip addresses and the corresponding interface to send
 struct arp_table {
     //mip address
-    uint8_t mip_addr[3];
+    uint8_t mip_addr[MAX_MIP_NODES];
     //interface number (in ifs_data.addr)
-    int sll_ifindex[3];
+    int sll_ifindex[MAX_MIP_NODES];
     //mac address
-    uint8_t sll_addr[3][6];
+    uint8_t sll_addr[MAX_MIP_NODES][MAC_ADDRESS_LENGTH];
     //number of entries in the arp table
     int arp_table_n;
 };
