@@ -16,8 +16,8 @@
 //   <MIP address to look up (8 bits)>
 struct routing_request_msg {
     uint8_t     host_mip_addr;
-    uint8_t     TTL;
-    uint8_t     R;
+    uint8_t     TTL; //Time To Live
+    uint8_t     R; //0x52
     uint8_t     E;
     uint8_t     Q;
     uint8_t     lookup_mip_addr;
@@ -32,11 +32,31 @@ struct routing_request_msg {
 //   <next hop MIP address (8 bits)>
 struct routing_response_msg{
     uint8_t     host_mip_addr;
-    uint8_t     TTL; //TTL is only 4 bits
+    uint8_t     TTL; //Time To Live
     uint8_t     R; //0x52
     uint8_t     S; //0x53
     uint8_t     P; //0x50
     uint8_t     next_hop_mip_addr;
+} __attribute__((packed));
+
+struct routing_hello_msg{
+    uint8_t     host_mip_addr;
+    uint8_t     TTL;
+    uint8_t     H;
+    uint8_t     E;
+    uint8_t     L;
+} __attribute__((packed));
+
+struct forward_table {
+};
+
+struct routing_update_msg{
+    uint8_t                 host_mip_addr;
+    uint8_t                 TTL;
+    uint8_t                 U;
+    uint8_t                 P;
+    uint8_t                 D;
+    struct  forward_table   ft;
 } __attribute__((packed));
 
 // FSM States
