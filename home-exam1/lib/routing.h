@@ -2,6 +2,7 @@
 #define routing_h
 
 #include <stdint.h>
+#include <sys/time.h>
 
 // A HELLO message for discovering neighbouring nodes.
 // An UPDATE message to advertise the routes in your routing table.
@@ -37,5 +38,20 @@ struct routing_response_msg{
     uint8_t     P; //0x50
     uint8_t     next_hop_mip_addr;
 } __attribute__((packed));
+
+// FSM States
+typedef enum {
+	INIT,
+	CONNECTED,
+	DISCONNECTED
+} node_state_t;
+
+// Neighbor structure
+typedef struct {
+	uint8_t mac_addr[6];      // MAC address of neighbor
+	time_t last_hello_time;   // Last time hello was received
+	int missed_hellos;        // Count of missed hellos
+	node_state_t state;       // Current state of this neighbor
+} neighbor_t;
 
 #endif //routing_h
