@@ -147,9 +147,16 @@ int mipd(
                 continue;
             }
 
-
+            //based on what type of router message was received, we want to do differnet things
             if(strncmp(router_sdu.payload, "HEL", 3) == 0){
                 debugprint("received HELLO message from router socket");
+                //send hello mip packet on all interfaces
+            }else if(strncmp(router_sdu.payload, "UPD", 3) == 0){
+                debugprint("received UDATE message from router socket");
+                //send update packet with routing table to all neighbors
+            }else if(strncmp(router_sdu.payload, "RSP", 3) == 0){
+                debugprint("received RESPONSE message from router socket");
+                //search queue for a packet that is to be sent to the dst mip addr in the request
             }
 
             debugprint("======================================router sock handled");
