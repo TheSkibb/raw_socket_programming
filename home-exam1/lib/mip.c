@@ -1,7 +1,6 @@
 #include <linux/if_packet.h>
 #include <sys/socket.h>
 #include <stdio.h>
-#include <asm-generic/errno-base.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -13,6 +12,29 @@
 #include "utils.h"
 #include "arp_table.h"
 #include "sockets.h"
+
+
+int forward_mip_packet(
+        struct ifs_data *ifs,
+        struct pdu *mip_pdu,
+        int interface_index,
+        uint8_t *dst_mac_addr
+){
+
+    debugprint("=Forwarding mip packet==================================");
+    send_mip_packet(
+            ifs,
+            interface_index,
+            dst_mac_addr,
+            mip_pdu->mip_hdr.src_addr,
+            mip_pdu->mip_hdr.dst_addr,
+            mip_pdu->mip_hdr.sdu_type,
+            mip_pdu->sdu
+    );
+    debugprint("========================================Forwarding done=");
+
+    return 0;
+}
 
 void print_mip_arp_header(
     struct mip_arp_hdr *miparphdr
@@ -116,7 +138,7 @@ int recv_mip_packet(
     return 0;
 }
 
-int handle_mip_packet(
+int handle_mip_arp_packet(
         struct ifs_data *ifs,
         struct arp_table *arp_t,
         struct unix_sock_sdu *sdu,
@@ -124,66 +146,105 @@ int handle_mip_packet(
         struct pdu *mip_pdu,
         int received_index
 ){
+    debugprint("type is MIP arp");
+    struct mip_arp_hdr *miparphdr = (struct mip_arp_hdr *)&mip_pdu->sdu;
 
-    //mip arp handling
-    if(mip_pdu->mip_hdr.sdu_type == MIP_TYPE_ARP){
-        debugprint("type is MIP arp");
-        struct mip_arp_hdr *miparphdr = (struct mip_arp_hdr *)&mip_pdu->sdu;
+    //check if this address already is in our mip cache
+    int index = arp_t_get_index_from_mip_addr(arp_t, mip_pdu->mip_hdr.src_addr);
 
-        //check if this address already is in our mip cache
-        int index = arp_t_get_index_from_mip_addr(arp_t, mip_pdu->mip_hdr.src_addr);
+    debugprint("index from table: %d", index);
 
-        debugprint("index from table: %d", index);
-
+    if(index == -1){
+        debugprint("address was not found in table");
+        index = arp_t_add_entry(arp_t, mip_pdu->mip_hdr.src_addr, received_index, mip_pdu->ethhdr.src_mac);
         if(index == -1){
-            debugprint("address was not found in table");
-            index = arp_t_add_entry(arp_t, mip_pdu->mip_hdr.src_addr, received_index, mip_pdu->ethhdr.src_mac);
-            if(index == -1){
-                printf("not enough space in arp table\n");
-                exit(EXIT_FAILURE);
-            }
+            printf("not enough space in arp table\n");
+            exit(EXIT_FAILURE);
         }
-
-        debugprint("THIS IS THE INDEX: %d", index);
-        debugprint("mip: %d", arp_t->mip_addr[index]);
-        debugprint("interface: %d", arp_t->sll_ifindex[index]);
-        print_mac_addr(arp_t->sll_addr[index], 6);
-
-        //if it is a request we send a response
-        if(miparphdr->Type == MIP_ARP_TYPE_REQUEST){
-
-            debugprint("received MIP ARP request: ");
-            send_mip_arp_response(
-                ifs, 
-                received_index, 
-                mip_pdu->ethhdr.src_mac, 
-                mip_pdu->mip_hdr.dst_addr
-            );
-
-        } else if(miparphdr->Type == MIP_ARP_TYPE_RESPONSE){
-            //check if we want to send any message to this address
-            if(mip_pdu->mip_hdr.src_addr == sdu->mip_addr){
-            debugprint("received MIP ARP from %d", mip_pdu->mip_hdr.src_addr);
-                send_mip_packet(
-                    ifs,
-                    arp_t->sll_ifindex[index],
-                    arp_t->sll_addr[index],
-                    sdu->mip_addr,
-                    MIP_TYPE_PING,
-                    (uint8_t *)sdu->payload
-                );
-            } else {
-                debugprint("received MIP ARP from %d, which we are not interested in", mip_pdu->mip_hdr.src_addr);
-            }
-        } else {
-            debugprint("mip arp type invalid");
-            return -1;
-        }
-        print_mip_arp_header(miparphdr);
     }
 
-    //send up to unix socket
-    if(mip_pdu->mip_hdr.sdu_type == MIP_TYPE_PING){
+    debugprint("THIS IS THE INDEX: %d", index);
+    debugprint("mip: %d", arp_t->mip_addr[index]);
+    debugprint("interface: %d", arp_t->sll_ifindex[index]);
+    print_mac_addr(arp_t->sll_addr[index], 6);
+
+    //if it is a request we send a response
+    if(miparphdr->Type == MIP_ARP_TYPE_REQUEST){
+
+        debugprint("received MIP ARP request: ");
+        send_mip_arp_response(
+            ifs, 
+            received_index, 
+            mip_pdu->ethhdr.src_mac, 
+            mip_pdu->mip_hdr.src_addr
+        );
+
+        uint8_t eth_broadcast[] = ETH_BROADCAST;
+
+        //forward mip arp request on all interfaces (except the one it was received on)
+        for(int i = 0; i < ifs->ifn; i++){
+            if(i != received_index){
+                forward_mip_packet(
+                        ifs,
+                        mip_pdu,
+                        i,
+                        eth_broadcast
+                );
+            }
+        }
+
+
+    } else if(miparphdr->Type == MIP_ARP_TYPE_RESPONSE){
+        //check if we want to send any message to this address
+        if(mip_pdu->mip_hdr.src_addr == sdu->mip_addr){
+        debugprint("received MIP ARP response from %d", mip_pdu->mip_hdr.src_addr);
+            send_mip_packet(
+                ifs,
+                arp_t->sll_ifindex[index],
+                arp_t->sll_addr[index],
+                ifs->mip_addr,
+                sdu->mip_addr,
+                MIP_TYPE_PING,
+                (uint8_t *)sdu->payload
+            );
+        } else {
+            debugprint("received MIP ARP from %d, which we are not interested in", mip_pdu->mip_hdr.src_addr);
+        }
+
+        //check if response was meant for another node
+        if(mip_pdu->mip_hdr.dst_addr != ifs->mip_addr){
+            debugprint("received MIP ARP response for %d", mip_pdu->mip_hdr.dst_addr);
+            uint8_t node_a_mac_addr[] = {0x00,0x00,0x00,0x00,0x00,0x02};
+            forward_mip_packet(
+                ifs,
+                mip_pdu,
+                0,
+                node_a_mac_addr
+            );
+        }
+    } else {
+        debugprint("mip arp type invalid");
+        return -1;
+    }
+    print_mip_arp_header(miparphdr);
+    return 0;
+}
+
+int handle_mip_ping_packet(
+        struct ifs_data *ifs,
+        struct arp_table *arp_t,
+        struct unix_sock_sdu *sdu,
+        int socket_unix,
+        struct pdu *mip_pdu,
+        int received_index
+){
+        // TODO: handle forwarding case
+        // needs to get info about what the next hop is from unix socket
+        if(mip_pdu->mip_hdr.dst_addr != ifs->mip_addr){
+
+            debugprint("this packets should be forwarded");
+            return 0;
+        }
         debugprint("received PING message: %s", mip_pdu->sdu);
         memcpy(sdu->payload, mip_pdu->sdu, 256);
         sdu->mip_addr = mip_pdu->mip_hdr.src_addr;
@@ -197,6 +258,26 @@ int handle_mip_packet(
            perror("write");
            exit(EXIT_FAILURE);
         }
+        return 0;
+}
+
+int handle_mip_packet(
+        struct ifs_data *ifs,
+        struct arp_table *arp_t,
+        struct unix_sock_sdu *sdu,
+        int socket_unix,
+        struct pdu *mip_pdu,
+        int received_index
+){
+
+    //mip arp handling
+    if(mip_pdu->mip_hdr.sdu_type == MIP_TYPE_ARP){
+        handle_mip_arp_packet(ifs, arp_t, sdu, socket_unix, mip_pdu, received_index);
+    }
+
+    //send up to unix socket
+    if(mip_pdu->mip_hdr.sdu_type == MIP_TYPE_PING){
+        handle_mip_ping_packet(ifs, arp_t, sdu, socket_unix, mip_pdu, received_index);
     }
 
     return mip_pdu->mip_hdr.sdu_type;
@@ -206,6 +287,7 @@ int send_mip_packet(
     struct ifs_data *ifs,
     int addr_index,
     uint8_t *dst_mac_addr,
+    uint8_t src_mip_addr,
     uint8_t dst_mip_addr,
     uint8_t type,
     uint8_t *sdu
@@ -231,12 +313,11 @@ int send_mip_packet(
 
     //fill in mip hdr
     miphdr.dst_addr = dst_mip_addr;
-    miphdr.src_addr = ifs->mip_addr;
+    miphdr.src_addr = src_mip_addr;
+    //miphdr.src_addr = ifs->mip_addr;
     miphdr.ttl = 1;
     miphdr.sdu_len = (sizeof(sdu)+3)/4;
     miphdr.sdu_type = type;
-
-    debugprint("sending SDU with number of bytes: %lu, and sdu_len: %d", sizeof(sdu), miphdr.sdu_len);
 
     //point to mip header
     msgvec[1].iov_base = &miphdr;
@@ -263,9 +344,10 @@ int send_mip_packet(
         return -1;
     }
 
-    debugprint("MIP packet sent to:");
-    print_mac_addr(ethhdr.dst_mac, 6);
+    debugprint("sending mip packet");
+    print_mip_header(&miphdr);
 
+    debugprint("MIP packet sent to:");
     free(msg);
 
     return rc;
@@ -301,6 +383,7 @@ int send_mip_arp_request(
             ifs,
             i,
             eth_broadcast,
+            ifs->mip_addr,
             mip_broadcast,
             MIP_TYPE_ARP,
             (uint8_t *)&arphdr
@@ -324,21 +407,24 @@ int send_mip_arp_response(
     ){
 
     uint8_t eth_broadcast[] = ETH_BROADCAST;
-    uint8_t mip_broadcast = 0xFF;
 
     struct mip_arp_hdr arphdr;
 
     arphdr.Type = MIP_ARP_TYPE_RESPONSE;
-    arphdr.Address = dst_mip_addr;
+    arphdr.Address = ifs->mip_addr;
 
     int rc = send_mip_packet(
         ifs,
         interface_index,
         eth_broadcast,
-        mip_broadcast,
+        ifs->mip_addr,
+        dst_mip_addr,
         MIP_TYPE_ARP,
         (uint8_t *)&arphdr
     );
 
     return rc;
 }
+
+int send_mip_route_hello(
+);

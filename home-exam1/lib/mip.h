@@ -8,11 +8,18 @@
 #include "arp_table.h"
 #include "sockets.h"
 
+//MIP types
 #define MIP_TYPE_ARP 0x01
 #define MIP_TYPE_PING 0x02
+#define MIP_TYPE_ROUTE 0x04
 
+//MIP arp types
 #define MIP_ARP_TYPE_REQUEST 0x0
 #define MIP_ARP_TYPE_RESPONSE 0x1
+
+//MIP route types
+#define MIP_ROUTE_TYPE_HELLO 0x0
+#define MIP_ROUTE_TYPE_UPDATE 0x01
 
 /* mip arp packet specification
     +--------+-----------+--------------------+
@@ -66,6 +73,9 @@ int send_mip_packet(
     int addr_index,
     //mac address of recipient
     uint8_t *dst_mac_addr,
+    //mip address of the source of the mip request
+    //(can be found in ifs_data)
+    uint8_t src_mip_addr,
     //mip address of recipient
     uint8_t dst_mip_addr,
     //type of mip package
