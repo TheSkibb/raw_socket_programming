@@ -27,7 +27,8 @@ int create_raw_socket(void){
 
 int create_unix_socket(
         char *socket_name,
-        int mode
+        int mode,
+        int identifier
 ){
 
     if(mode == UNIX_SOCKET_MODE_SERVER){
@@ -53,7 +54,6 @@ int create_unix_socket(
 
     memset(&name, 0, sizeof(name));
 
-
     name.sun_family = AF_UNIX;
     strncpy(name.sun_path, socket_name, sizeof(name.sun_path) - 1);
 
@@ -74,38 +74,19 @@ int create_unix_socket(
            exit(EXIT_FAILURE);
         }
     }
+
+    if(identifier != 0){
+        //send identifier
+        int w = write(connection_socket, &identifier, sizeof(uint8_t));
+        if (w == -1) {
+           perror("write");
+           exit(EXIT_FAILURE);
+        }
+    }
+
     debugprint("returning unix socket with name %s", name);
 
     return connection_socket;
-}
-
-void handle_unix_socket_message(int unix_sockfd, struct unix_sock_sdu *sdu) {
-
-    char buffer[BUFFER_SIZE];
-    memset(buffer, 0, BUFFER_SIZE); // Clear the buffer
-    int data_socket;
-
-    // Accept a new connection
-    data_socket = accept(unix_sockfd, NULL, NULL);
-    if (data_socket == -1) {
-        perror("accept");
-        close(data_socket); 
-        exit(EXIT_FAILURE);
-    }
-    // Wait for next data packet from the accepted socket
-    int rc = read(data_socket, sdu, sizeof(struct unix_sock_sdu)); // Leave space for null-termination
-    if (rc == -1) {
-        perror("read");
-        close(data_socket); 
-        exit(EXIT_FAILURE);
-    }
-
-    // Properly handle the bytes read; ensure there's at least one byte read
-    // rc = number of bytes received from read operation
-    if (rc > 0) {
-        // Null-terminate the string
-        buffer[rc] = '\0';
-    }
 }
 
 int new_unix_connection(int unix_sockfd){
