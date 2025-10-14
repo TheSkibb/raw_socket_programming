@@ -133,5 +133,9 @@ int send_mip_arp_response(
     uint8_t dst_mip_addr
 );
 
+int send_mip_route_hello(
+        struct ifs_data *ifs
+);
+
 #endif
 

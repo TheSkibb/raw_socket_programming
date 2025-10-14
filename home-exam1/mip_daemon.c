@@ -94,6 +94,7 @@ int mipd(
                 socket_application = socket_data;
             }else if(identifier == SOCKET_TYPE_ROUTER){
                 socket_routing = socket_data;
+                interfaces->rusock = socket_data;
             }
             debugprint("the socket is of type: %d", identifier);
 
@@ -151,9 +152,10 @@ int mipd(
             if(strncmp(router_sdu.payload, "HEL", 3) == 0){
                 debugprint("received HELLO message from router socket");
                 //send hello mip packet on all interfaces
+                send_mip_route_hello(interfaces);
             }else if(strncmp(router_sdu.payload, "UPD", 3) == 0){
                 debugprint("received UDATE message from router socket");
-                //send update packet with routing table to all neighbors
+                //send update packet with routing table neighbors
             }else if(strncmp(router_sdu.payload, "RSP", 3) == 0){
                 debugprint("received RESPONSE message from router socket");
                 //search queue for a packet that is to be sent to the dst mip addr in the request

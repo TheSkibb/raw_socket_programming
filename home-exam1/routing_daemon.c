@@ -15,6 +15,23 @@ void print_usage(){
     printf("./routing_daemon <socket_lower>\n");
 }
 
+struct neighbor{
+    uint8_t mip_addr;
+    uint8_t mac_addr[6];
+    uint8_t interface_index;
+}__attribute__((packed));
+
+struct route{
+    uint8_t dst; //
+    uint8_t next_hop;
+    uint8_t cost;
+}__attribute__((packed));
+
+
+struct route_table{
+    struct route routes[5];
+}__attribute__((packed));
+
 int main(int argc, char *argv[]){
     set_debug(1);
     debugprint("=checking cmd arguments=====================");
@@ -46,11 +63,11 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
-    // Set the timer to expire every 2 seconds
+    int timer_interval = 5; //seconds
     struct itimerspec new_value;
-    new_value.it_value.tv_sec = 2; // Initial expiration
+    new_value.it_value.tv_sec = timer_interval; // Initial expiration
     new_value.it_value.tv_nsec = 0;
-    new_value.it_interval.tv_sec = 2; // Interval
+    new_value.it_interval.tv_sec = timer_interval; // Interval
     new_value.it_interval.tv_nsec = 0;
 
     if (timerfd_settime(timerfd, 0, &new_value, NULL) == -1) {
@@ -102,7 +119,23 @@ int main(int argc, char *argv[]){
             debugprint("=======================================done=\n");
 
         }else if(events->data.fd == socket_unix){
+            debugprint("=Received a unix message======================");
             //do some stuff
+            struct unix_sock_sdu recv_sdu;
+            memset(&recv_sdu, 0, sizeof(struct unix_sock_sdu));
+
+            int r = read(socket_unix, (void *)&recv_sdu, sizeof(struct unix_sock_sdu));
+            if (r == -1) {
+               perror("read");
+               exit(EXIT_FAILURE);
+            }
+            if (r == 0){
+                debugprint("connection closed");
+                exit(EXIT_SUCCESS);
+            }
+
+            debugprint("Message is %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
+            debugprint("=======================================done=\n");
         }
     }
     return 0;

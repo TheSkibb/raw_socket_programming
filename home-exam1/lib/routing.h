@@ -15,9 +15,7 @@
 
 // An UPDATE message to advertise the routes in your routing table.
 // NOTICE: you need to add the routing table after this message
-#define ROUTING_UPDATE_MSG { 0x55, 0x50, 0x44} //UPD
-
-
+#define ROUTING_UPDATE_MSG {0x55, 0x50, 0x44, 0xFF} //UPD<mip address>
 
 //   A REQUEST message for intra-host route lookups.
 //   <MIP address of the host itself (8 bits)> 

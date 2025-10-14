@@ -26,6 +26,8 @@ struct ifs_data {
 	int rsock;
     //unix socket
     int usock;
+    //unix socket router
+    int rusock;
 	//interface number (unique for each interface)
 	int ifn;
     //mip address

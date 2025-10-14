@@ -12,6 +12,7 @@
 #include "utils.h"
 #include "arp_table.h"
 #include "sockets.h"
+#include "routing.h"
 
 
 int forward_mip_packet(
@@ -129,8 +130,8 @@ int recv_mip_packet(
         exit(EXIT_FAILURE);
     }
 
-    debugprint("copying: \"%s\"", &packet);
     memcpy(out_pdu->sdu, &packet, 256);
+    debugprint("copyied: \"%s\"", out_pdu->sdu);
     memcpy(&out_pdu->mip_hdr, &miphdr, sizeof(struct mip_hdr));
     memcpy(&out_pdu->ethhdr, &ethhdr, sizeof(struct eth_hdr));
     *out_received_index = received_index;
@@ -138,6 +139,45 @@ int recv_mip_packet(
     return 0;
 }
 
+//function for handling routing packets (type 0x04)
+int handle_mip_route_packet(
+    struct ifs_data *ifs,
+    struct arp_table *arp_t,
+    struct unix_sock_sdu *sdu,
+    int socket_unix,
+    struct pdu *mip_pdu,
+    int received_index
+){
+    if(strncmp((char *)mip_pdu->sdu, "HEL", 3) == 0){
+        debugprint("routing message is a HELLO message");
+
+        //add to arp table
+
+        //send to unix socket
+        struct unix_sock_sdu send_unix;
+        memset(&send_unix, 0, sizeof(struct unix_sock_sdu));
+        uint8_t msg[] = ROUTING_HELLO_MSG;
+        memcpy(send_unix.payload, msg, sizeof(msg));
+        send_unix.mip_addr = mip_pdu->mip_hdr.src_addr;
+       
+        int w = write(ifs->rusock, &send_unix, sizeof(struct unix_sock_sdu));
+        if(w == -1){
+            perror("write");
+            exit(EXIT_FAILURE);
+        }
+
+    }else if(strncmp((char *)mip_pdu->sdu, "UPD", 3) == 0){
+        debugprint("routing message is a UPDATE message");
+    }
+
+    return 0;
+}
+
+//function for handling mip arp packets
+//adds the source to ARP table if not present.
+//if the packet is a MIP_ARP_TYPE_REQUEST we send a response
+//if the packet is a MIP_ARP_TYPE_RESPONSE we check if there is a packet queued for this node (sdu != 0)
+//TODO: change for queue?
 int handle_mip_arp_packet(
         struct ifs_data *ifs,
         struct arp_table *arp_t,
@@ -275,9 +315,14 @@ int handle_mip_packet(
         handle_mip_arp_packet(ifs, arp_t, sdu, socket_unix, mip_pdu, received_index);
     }
 
-    //send up to unix socket
+    //ping handling
     if(mip_pdu->mip_hdr.sdu_type == MIP_TYPE_PING){
         handle_mip_ping_packet(ifs, arp_t, sdu, socket_unix, mip_pdu, received_index);
+    }
+
+    //route handling
+    if(mip_pdu->mip_hdr.sdu_type == MIP_TYPE_ROUTE){
+        handle_mip_route_packet(ifs, arp_t, sdu, socket_unix, mip_pdu, received_index);
     }
 
     return mip_pdu->mip_hdr.sdu_type;
@@ -426,5 +471,36 @@ int send_mip_arp_response(
     return rc;
 }
 
+
 int send_mip_route_hello(
-);
+        struct ifs_data *ifs
+){
+    debugprint("preparing to send mip arp request\n");
+
+    uint8_t eth_broadcast[] = ETH_BROADCAST;
+    uint8_t mip_broadcast = 0xFF;
+
+    uint8_t hello[3] = ROUTING_HELLO_MSG;
+
+    int rc = 0;
+
+    //TODO: send on all interfaces
+    for(int i = 0; i < ifs->ifn; i++){
+        debugprint("sending mip request %d / %d", i+1, ifs->ifn);
+        rc = send_mip_packet(
+            ifs,
+            i,
+            eth_broadcast,
+            ifs->mip_addr,
+            mip_broadcast,
+            MIP_TYPE_ROUTE,
+            hello
+        );
+
+        if(rc < 1){
+            printf("epic fail :(\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    return 0;
+}
