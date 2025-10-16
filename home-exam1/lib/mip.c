@@ -148,6 +148,10 @@ int handle_mip_route_packet(
     struct pdu *mip_pdu,
     int received_index
 ){
+    if(ifs->rusock == -1){
+        debugprint("no routing_deamon is attached");
+        return -1;
+    }
     if(strncmp((char *)mip_pdu->sdu, "HEL", 3) == 0){
         debugprint("routing message is a HELLO message");
 

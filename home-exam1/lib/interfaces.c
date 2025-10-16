@@ -53,6 +53,7 @@ void init_ifs(
 
 	/* We use one RAW socket per node */
 	ifs->rsock = rsock;
+    ifs->rusock = -1;
 }
 
 /*

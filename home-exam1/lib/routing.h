@@ -35,19 +35,4 @@
 //   <next hop MIP address (8 bits)>
 #define ROUTING_RESPONSE_MSG {0x52, 0x53, 0x50, 0xFF} //RSP<mip address>
 
-// FSM States
-typedef enum {
-	INIT,
-	CONNECTED,
-	DISCONNECTED
-} node_state_t;
-
-// Neighbor structure
-typedef struct {
-	uint8_t mac_addr[6];      // MAC address of neighbor
-	time_t last_hello_time;   // Last time hello was received
-	int missed_hellos;        // Count of missed hellos
-	node_state_t state;       // Current state of this neighbor
-} neighbor_t;
-
 #endif //routing_h

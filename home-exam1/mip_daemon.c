@@ -111,6 +111,8 @@ int mipd(
             if(rc == 0){
                 debugprint("========================================= socket closed=");
                 close(socket_application);
+                socket_application = -1;
+                interfaces->rusock = -1;
                 continue;
             }
             

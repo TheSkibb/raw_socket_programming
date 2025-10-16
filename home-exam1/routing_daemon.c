@@ -5,21 +5,30 @@
 #include <sys/timerfd.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "lib/utils.h"
 #include "lib/sockets.h"
 #include "lib/utils.h"
 #include "lib/routing.h"
 
-void print_usage(){
-    printf("./routing_daemon <socket_lower>\n");
-}
+//Data structures local to only routing_deamon
 
-struct neighbor{
-    uint8_t mip_addr;
-    uint8_t mac_addr[6];
-    uint8_t interface_index;
-}__attribute__((packed));
+// FSM States
+typedef enum {
+	INIT,
+	CONNECTED,
+	DISCONNECTED
+} node_state_t;
+
+// Neighbor structure
+typedef struct {
+	uint8_t mip_addr;        //mip address of neighbor
+	time_t last_hello_time;   // Last time hello was received
+	int missed_hellos;        // Count of missed hellos
+	node_state_t state;       // Current state of this neighbor
+} neighbour_t;
+
 
 struct route{
     uint8_t dst; //
@@ -27,10 +36,120 @@ struct route{
     uint8_t cost;
 }__attribute__((packed));
 
+//in this scenario we have 5 nodes, so number of nodes will not exceed 5
+#define MAX_ROUTES 5
 
 struct route_table{
-    struct route routes[5];
+    struct route routes[MAX_ROUTES];
 }__attribute__((packed));
+
+//in this scenario there is 5 nodes, 
+//max number of connections for home-exam topology is 3
+#define MAX_NEIGHBOURS 5
+
+struct neighbour_table{
+    //list (array) of neightbors
+    neighbour_t neighbours[MAX_NEIGHBOURS];
+    //how many neighbours are stored in the table
+    //increases automatically when neighbour_table_add_entry is called
+    int count;
+}__attribute__((packed));
+
+//finds a matching entry to the mip address in the neighbour_table
+//returns index of matching entry, or -1 if no match was found
+int find_neighbour_by_addr(
+    struct neighbour_table *n_t, 
+    uint8_t mip_addr
+){
+    for(int i = 0; i < MAX_NEIGHBOURS; i++){
+        if(n_t->neighbours[i].mip_addr == mip_addr){
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+//returns the index of the added entry, or -1 if there was no available slots
+int neighbour_table_add_entry(
+        struct neighbour_table *n_t, 
+        uint8_t mip_addr
+){
+    int i = n_t->count;
+
+    //table is full
+    if(i == MAX_NEIGHBOURS - 1){
+        return -1;
+    }
+
+    n_t->neighbours[i].mip_addr = mip_addr;
+    n_t->neighbours[i].last_hello_time = time(NULL);
+    n_t->neighbours[i].state = INIT;
+    n_t->neighbours[i].missed_hellos = 0;
+
+    n_t->count++;
+
+    return i;
+}
+
+void print_usage(){
+    printf("./routing_daemon <socket_lower>\n");
+}
+
+void send_hello_message(int socket_unix){
+            debugprint("=Sending hello message========================");
+            struct unix_sock_sdu message;
+            memset(&message, 0, sizeof(message));
+
+            uint8_t msg[] = ROUTING_HELLO_MSG; //HEL
+            memcpy(message.payload, msg, sizeof(msg));
+
+            message.mip_addr = 0x00;
+
+            if(send(socket_unix, &message, sizeof(message), 0) == -1){
+                perror("send");
+                exit(EXIT_FAILURE);
+            }
+
+            debugprint("=======================================done=\n");
+}
+
+void send_update_message(int socket_unix){
+            debugprint("=Sending hello message========================");
+            struct unix_sock_sdu message;
+            memset(&message, 0, sizeof(message));
+
+            uint8_t msg[] = ROUTING_UPDATE_MSG; //UPD
+            memcpy(message.payload, msg, sizeof(msg));
+
+            message.mip_addr = 0x00;
+
+            if(send(socket_unix, &message, sizeof(message), 0) == -1){
+                perror("send");
+                exit(EXIT_FAILURE);
+            }
+
+            debugprint("=======================================done=\n");
+}
+
+void print_tables(struct neighbour_table *n_t, struct route_table *r_t){
+    if(get_debug() == 0){
+        return;
+    }
+    printf("neighbours: \n");
+    printf("|mip\t|seconds\t|missed \t|state\t|\n");
+    for(int i = 0; (i < MAX_NEIGHBOURS && i < MAX_ROUTES); i++){
+        if(i < MAX_NEIGHBOURS && i < n_t->count){
+            printf("|%d\t|%lo\t|%d\t|%d\t|\n", 
+                    n_t->neighbours[i].mip_addr,
+                    time(NULL) - n_t->neighbours[i].last_hello_time,
+                    n_t->neighbours[i].missed_hellos,
+                    n_t->neighbours[i].state
+                    );
+        }
+    }
+    printf("\n\n");
+}
 
 int main(int argc, char *argv[]){
     set_debug(1);
@@ -51,6 +170,16 @@ int main(int argc, char *argv[]){
     debugprint("=unix socket setup==========================");
 
     int socket_unix = create_unix_socket(socket_unix_name, UNIX_SOCKET_MODE_CLIENT, SOCKET_TYPE_ROUTER);
+
+    debugprint("=======================================done=\n");
+
+    debugprint("=setup tables=================================");
+
+    struct neighbour_table n_table;
+    memset(&n_table, 0, sizeof(struct neighbour_table));
+
+    struct route_table r_table;
+    memset(&r_table, 0, sizeof(struct route_table));
 
     debugprint("=======================================done=\n");
 
@@ -89,6 +218,7 @@ int main(int argc, char *argv[]){
     debugprint("=setup done, now entering main loop=========\n\n\n\n\n");
 
     int rc;
+    int update_table_changed = 0;
     uint64_t missed;
     while(1){
         rc = epoll_wait(epollfd, events, epoll_max_events, -1);
@@ -96,7 +226,13 @@ int main(int argc, char *argv[]){
             perror("epoll_wait");
             exit(EXIT_FAILURE);
         }else if(events->data.fd == timerfd){
-            debugprint("=Sending hello message========================");
+            //every 5 seconds the routing deamon:
+            //  checks for changes in the update table
+            //  sends a HELLO or UPDATE message (depending on whether or not update table was changed)
+            //  check the time diff for the neighbor table if some node is DISCONNECTED
+            //
+
+
             //read the timer file descriptor to remove the event from epoll
             ssize_t s = read(timerfd, &missed, sizeof(uint64_t));
             if(s != sizeof(uint64_t)){
@@ -104,23 +240,17 @@ int main(int argc, char *argv[]){
                 exit(EXIT_FAILURE);
             }
 
-            //every 30 seconds check send update message
+            //print current state
+            print_tables(&n_table, &r_table);
 
-
-            struct unix_sock_sdu message;
-            memset(&message, 0, sizeof(message));
-
-            uint8_t msg[] = ROUTING_HELLO_MSG; //HEL
-            memcpy(message.payload, msg, sizeof(msg));
-
-            message.mip_addr = 0x00;
-
-            send(socket_unix, &message, sizeof(message), 0);
-            debugprint("=======================================done=\n");
+            if(update_table_changed == 0){
+                send_hello_message(socket_unix);
+            }else{
+                send_update_message(socket_unix);
+            }
 
         }else if(events->data.fd == socket_unix){
             debugprint("=Received a unix message======================");
-            //do some stuff
             struct unix_sock_sdu recv_sdu;
             memset(&recv_sdu, 0, sizeof(struct unix_sock_sdu));
 
@@ -134,7 +264,22 @@ int main(int argc, char *argv[]){
                 exit(EXIT_SUCCESS);
             }
 
-            debugprint("Message is %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
+            if(strncmp(recv_sdu.payload, "HEL", 3) == 0){
+                debugprint("HELLO message: %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
+
+                //check neighbour list
+                int index = find_neighbour_by_addr(&n_table, recv_sdu.mip_addr);
+                //if not in neighbour list -> add, in state INIT
+                if(index == -1){
+                    debugprint("%d was not found in n_table, adding it now", recv_sdu.mip_addr);
+                    neighbour_table_add_entry(&n_table, recv_sdu.mip_addr);
+                }
+                //if in list && state == INIT -> set state to CONNECTED
+                //set last_hello_time
+            }else{
+                debugprint("message: %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
+            }
+
             debugprint("=======================================done=\n");
         }
     }
