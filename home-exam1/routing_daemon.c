@@ -152,6 +152,14 @@ void print_tables(struct neighbour_table *n_t, struct route_table *r_t){
 }
 
 void check_neighbors(struct neighbour_table *n_table){
+    debugprint("times");
+    for(int i = 0; i < n_table->count ; i++){
+        long time_diff = time(NULL) - n_table->neighbours[i].last_hello_time;
+        if(time_diff > 15){
+            debugprint("neighbor: %s has not said hello in %lo seconds");
+            n_table->neighbours[i].state = DISCONNECTED;
+        }
+    }   
 }
 
 #define EPOLL_MAX_EVENTS 10
