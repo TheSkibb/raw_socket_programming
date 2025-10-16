@@ -140,15 +140,103 @@ void print_tables(struct neighbour_table *n_t, struct route_table *r_t){
     printf("|mip\t|seconds\t|missed \t|state\t|\n");
     for(int i = 0; (i < MAX_NEIGHBOURS && i < MAX_ROUTES); i++){
         if(i < MAX_NEIGHBOURS && i < n_t->count){
-            printf("|%d\t|%lo\t|%d\t|%d\t|\n", 
-                    n_t->neighbours[i].mip_addr,
-                    time(NULL) - n_t->neighbours[i].last_hello_time,
-                    n_t->neighbours[i].missed_hellos,
-                    n_t->neighbours[i].state
-                    );
+            printf("|%d\t|%lo\t\t|%d\t\t|%s\t|\n", 
+                n_t->neighbours[i].mip_addr,
+                time(NULL) - n_t->neighbours[i].last_hello_time,
+                n_t->neighbours[i].missed_hellos,
+                (n_t->neighbours[i].state == CONNECTED) ? "CONNECTED" : "DISCONNECTED"
+            );
         }
     }
     printf("\n\n");
+}
+
+void check_neighbors(struct neighbour_table *n_table){
+}
+
+#define EPOLL_MAX_EVENTS 10
+
+void routing_daemon(
+        int epollfd,
+        struct epoll_event events[EPOLL_MAX_EVENTS],
+        int timerfd,
+        struct neighbour_table *n_table,
+        struct route_table *r_table,
+        int socket_unix
+){
+    int rc;
+    int update_table_changed = 0;
+    uint64_t missed;
+    while(1){
+        rc = epoll_wait(epollfd, events, EPOLL_MAX_EVENTS, -1);
+        if(rc == -1){
+            perror("epoll_wait");
+            exit(EXIT_FAILURE);
+        }else if(events->data.fd == timerfd){
+            //every 5 seconds the routing deamon:
+            //  checks for changes in the update table
+            //  sends a HELLO or UPDATE message (depending on whether or not update table was changed)
+            //  check the time diff for the neighbor table if some node is DISCONNECTED
+
+            //read the timer file descriptor to remove the event from epoll
+            ssize_t s = read(timerfd, &missed, sizeof(uint64_t));
+            if(s != sizeof(uint64_t)){
+                perror("read");
+                exit(EXIT_FAILURE);
+            }
+
+            //print current state
+            print_tables(n_table, r_table);
+
+            check_neighbors(n_table);
+
+            if(update_table_changed == 0){
+                send_hello_message(socket_unix);
+            }else{
+                send_update_message(socket_unix);
+            }
+
+        }else if(events->data.fd == socket_unix){
+            debugprint("=Received a unix message======================");
+            struct unix_sock_sdu recv_sdu;
+            memset(&recv_sdu, 0, sizeof(struct unix_sock_sdu));
+
+            int r = read(socket_unix, (void *)&recv_sdu, sizeof(struct unix_sock_sdu));
+            if (r == -1) {
+               perror("read");
+               exit(EXIT_FAILURE);
+            }
+            if (r == 0){
+                debugprint("connection closed");
+                exit(EXIT_SUCCESS);
+            }
+
+            if(strncmp(recv_sdu.payload, "HEL", 3) == 0){
+                debugprint("HELLO message: %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
+
+                //check neighbour list
+                int index = find_neighbour_by_addr(n_table, recv_sdu.mip_addr);
+
+                //if not in neighbour list -> add, in state INIT
+                if(index == -1){
+                    debugprint("%d was not found in n_table, adding it now", recv_sdu.mip_addr);
+                    index = neighbour_table_add_entry(n_table, recv_sdu.mip_addr);
+                }else if(n_table->neighbours[index].state == INIT){
+                //if in list && state == INIT -> set state to CONNECTED
+                    n_table->neighbours[index].state = CONNECTED;
+                }else if(n_table->neighbours[index].state == DISCONNECTED){
+                //if in list && state == DISCONNECTED -> set state to CONNECTED
+                    n_table->neighbours[index].state = CONNECTED;
+                }
+
+                n_table->neighbours[index].last_hello_time = time(NULL);
+            }else{
+                debugprint("message: %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
+            }
+
+            debugprint("=======================================done=\n");
+        }
+    }
 }
 
 int main(int argc, char *argv[]){
@@ -211,78 +299,20 @@ int main(int argc, char *argv[]){
     int epollfd = create_epoll_table();
     add_socket_to_epoll(epollfd, socket_unix, EPOLLIN);
     add_socket_to_epoll(epollfd, timerfd, EPOLLIN);
-    int epoll_max_events = 10;
-    struct epoll_event events[epoll_max_events];
+    struct epoll_event events[EPOLL_MAX_EVENTS];
 
     debugprint("=======================================done=\n");
-    debugprint("=setup done, now entering main loop=========\n\n\n\n\n");
+    debugprint("=setup done, starting routing daemon========\n\n\n\n\n");
 
-    int rc;
-    int update_table_changed = 0;
-    uint64_t missed;
-    while(1){
-        rc = epoll_wait(epollfd, events, epoll_max_events, -1);
-        if(rc == -1){
-            perror("epoll_wait");
-            exit(EXIT_FAILURE);
-        }else if(events->data.fd == timerfd){
-            //every 5 seconds the routing deamon:
-            //  checks for changes in the update table
-            //  sends a HELLO or UPDATE message (depending on whether or not update table was changed)
-            //  check the time diff for the neighbor table if some node is DISCONNECTED
-            //
+    routing_daemon(
+        epollfd,
+        events,
+        timerfd,
+        &n_table,
+        &r_table,
+        socket_unix
+    );
 
-
-            //read the timer file descriptor to remove the event from epoll
-            ssize_t s = read(timerfd, &missed, sizeof(uint64_t));
-            if(s != sizeof(uint64_t)){
-                perror("read");
-                exit(EXIT_FAILURE);
-            }
-
-            //print current state
-            print_tables(&n_table, &r_table);
-
-            if(update_table_changed == 0){
-                send_hello_message(socket_unix);
-            }else{
-                send_update_message(socket_unix);
-            }
-
-        }else if(events->data.fd == socket_unix){
-            debugprint("=Received a unix message======================");
-            struct unix_sock_sdu recv_sdu;
-            memset(&recv_sdu, 0, sizeof(struct unix_sock_sdu));
-
-            int r = read(socket_unix, (void *)&recv_sdu, sizeof(struct unix_sock_sdu));
-            if (r == -1) {
-               perror("read");
-               exit(EXIT_FAILURE);
-            }
-            if (r == 0){
-                debugprint("connection closed");
-                exit(EXIT_SUCCESS);
-            }
-
-            if(strncmp(recv_sdu.payload, "HEL", 3) == 0){
-                debugprint("HELLO message: %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
-
-                //check neighbour list
-                int index = find_neighbour_by_addr(&n_table, recv_sdu.mip_addr);
-                //if not in neighbour list -> add, in state INIT
-                if(index == -1){
-                    debugprint("%d was not found in n_table, adding it now", recv_sdu.mip_addr);
-                    neighbour_table_add_entry(&n_table, recv_sdu.mip_addr);
-                }
-                //if in list && state == INIT -> set state to CONNECTED
-                //set last_hello_time
-            }else{
-                debugprint("message: %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
-            }
-
-            debugprint("=======================================done=\n");
-        }
-    }
     return 0;
 
 }

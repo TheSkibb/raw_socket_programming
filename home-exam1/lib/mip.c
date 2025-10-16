@@ -166,6 +166,7 @@ int handle_mip_route_packet(
        
         int w = write(ifs->rusock, &send_unix, sizeof(struct unix_sock_sdu));
         if(w == -1){
+            debugprint("rusock %d", ifs->rusock);
             perror("write");
             exit(EXIT_FAILURE);
         }
