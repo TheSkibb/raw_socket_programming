@@ -1,8 +1,6 @@
-#include <stdio.h>
 #include <string.h>
 
 #include "arp_table.h"
-#include "utils.h"
 
 int arp_t_add_entry(
     struct arp_table *arp_t,

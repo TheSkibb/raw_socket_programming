@@ -177,7 +177,20 @@ int handle_mip_route_packet(
         }
 
     }else if(strncmp((char *)mip_pdu->sdu, "UPD", 3) == 0){
-        debugprint("routing message is a UPDATE message");
+        debugprint("routing message is a UPDATE message, sending down to unix socket");
+        //send to unix socket
+        struct unix_sock_sdu send_unix;
+        memset(&send_unix, 0, sizeof(struct unix_sock_sdu));
+        uint8_t msg[] = ROUTING_UPDATE_MSG;
+        memcpy(send_unix.payload, msg, sizeof(msg));
+        send_unix.mip_addr = mip_pdu->mip_hdr.src_addr;
+       
+        int w = write(ifs->rusock, &send_unix, sizeof(struct unix_sock_sdu));
+        if(w == -1){
+            debugprint("rusock %d", ifs->rusock);
+            perror("write");
+            exit(EXIT_FAILURE);
+        }
     }
 
     return 0;
@@ -521,7 +534,6 @@ int send_mip_route_update(
     struct arp_table *arp_t
 ){
     //create a route_table from payload
-    
     int offset = 3; //(first 3 entries are UPD)
     struct route_table r_t;
     //first entry is the count
@@ -531,8 +543,19 @@ int send_mip_route_update(
     //copy the rest of the payload
     memcpy(&r_t.routes, router_sdu->payload+offset+1, MAX_ROUTES*3);
     print_routing_table(&r_t);
-    
-    //int rc = send_mip_packet();
 
-    return 0;
+    //get the node from the arp table
+    int index = arp_t_get_index_from_mip_addr(arp_t, router_sdu->mip_addr);
+    
+    int rc = send_mip_packet(
+            ifs,
+            arp_t->sll_ifindex[index],
+            arp_t->sll_addr[index],
+            ifs->mip_addr,
+            router_sdu->mip_addr,
+            MIP_TYPE_ROUTE,
+            (uint8_t *)router_sdu->payload
+    );
+
+    return rc;
 }

@@ -232,8 +232,44 @@ void check_neighbors(struct neighbour_table *n_table){
         }
         //TODO: update routing table with infinity for all the 
     }   
+}
 
+int handle_hello_message(
+        struct neighbour_table *n_table,
+        struct route_table *r_table,
+        struct unix_sock_sdu *recv_sdu,
+        int *update_table_changed
+){
+    //check neighbour list
+    int index = find_neighbour_by_addr(n_table, recv_sdu->mip_addr);
 
+    //if not in neighbour list -> add, in state INIT
+    if(index == -1){
+        debugprint("%d was not found in n_table, adding it now", recv_sdu->mip_addr);
+        index = neighbour_table_add_entry(n_table, recv_sdu->mip_addr);
+        routing_table_add_entry(r_table, recv_sdu->mip_addr, recv_sdu->mip_addr, 1);
+        *update_table_changed = 1;
+    }else if(n_table->neighbours[index].state == INIT){
+    //if in list && state == INIT -> set state to CONNECTED
+        n_table->neighbours[index].state = CONNECTED;
+    }else if(n_table->neighbours[index].state == DISCONNECTED){
+    //if in list && state == DISCONNECTED -> set state to CONNECTED
+        n_table->neighbours[index].state = CONNECTED;
+    }
+
+    n_table->neighbours[index].last_hello_time = time(NULL);
+
+    return 0;
+}
+
+int handle_update_message(
+        struct neighbour_table *n_table,
+        struct route_table *r_table,
+        struct unix_sock_sdu *recv_sdu,
+        int *update_table_changed
+){
+    debugprint("RECEIVED A ROUTING TABLE UPDATE");
+    return 0;
 }
 
 void routing_daemon(
@@ -296,25 +332,21 @@ void routing_daemon(
 
             if(strncmp(recv_sdu.payload, "HEL", 3) == 0){
                 debugprint("HELLO message: %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
-
-                //check neighbour list
-                int index = find_neighbour_by_addr(n_table, recv_sdu.mip_addr);
-
-                //if not in neighbour list -> add, in state INIT
-                if(index == -1){
-                    debugprint("%d was not found in n_table, adding it now", recv_sdu.mip_addr);
-                    index = neighbour_table_add_entry(n_table, recv_sdu.mip_addr);
-                    routing_table_add_entry(r_table, recv_sdu.mip_addr, recv_sdu.mip_addr, 1);
-                    update_table_changed = 1;
-                }else if(n_table->neighbours[index].state == INIT){
-                //if in list && state == INIT -> set state to CONNECTED
-                    n_table->neighbours[index].state = CONNECTED;
-                }else if(n_table->neighbours[index].state == DISCONNECTED){
-                //if in list && state == DISCONNECTED -> set state to CONNECTED
-                    n_table->neighbours[index].state = CONNECTED;
-                }
-
-                n_table->neighbours[index].last_hello_time = time(NULL);
+                handle_hello_message(
+                        n_table,
+                        r_table,
+                        &recv_sdu,
+                        &update_table_changed
+                );
+            }else if(strncmp(recv_sdu.payload, "UPD", 3) == 0){
+                debugprint("UPDATE message from %d", recv_sdu.mip_addr);
+                handle_update_message(
+                        n_table,
+                        r_table,
+                        &recv_sdu,
+                        &update_table_changed
+                );
+                
             }else{
                 debugprint("message: %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
             }
