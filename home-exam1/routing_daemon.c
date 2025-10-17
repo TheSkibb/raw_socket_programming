@@ -12,6 +12,20 @@
 #include "lib/utils.h"
 #include "lib/routing.h"
 
+//Constants
+
+//amount of neightbors the neighbor list will hold
+//in this scenario there is 5 nodes, 
+//max number of connections for home-exam topology is 3
+#define MAX_NEIGHBOURS 5
+
+//time interval between sending hello/update messages
+#define TIMER_INTERVAL 5 
+
+//how many seconds can go since last hello before node is disconnected
+#define DISCONNECTION_TIME_LIMIT 5 * TIMER_INTERVAL 
+#define EPOLL_MAX_EVENTS 10
+
 //Data structures local to only routing_deamon
 
 // FSM States
@@ -29,26 +43,9 @@ typedef struct {
 	node_state_t state;       // Current state of this neighbor
 } neighbour_t;
 
-
-struct route{
-    uint8_t dst; //
-    uint8_t next_hop;
-    uint8_t cost;
-}__attribute__((packed));
-
-//in this scenario we have 5 nodes, so number of nodes will not exceed 5
-#define MAX_ROUTES 5
-
-struct route_table{
-    struct route routes[MAX_ROUTES];
-}__attribute__((packed));
-
-//in this scenario there is 5 nodes, 
-//max number of connections for home-exam topology is 3
-#define MAX_NEIGHBOURS 5
-
+//data structure for storing neighbours
 struct neighbour_table{
-    //list (array) of neightbors
+    //list (array) of neighbours
     neighbour_t neighbours[MAX_NEIGHBOURS];
     //how many neighbours are stored in the table
     //increases automatically when neighbour_table_add_entry is called
@@ -70,6 +67,7 @@ int find_neighbour_by_addr(
     return -1;
 }
 
+//add an entry to the entry table
 //returns the index of the added entry, or -1 if there was no available slots
 int neighbour_table_add_entry(
         struct neighbour_table *n_t, 
@@ -88,6 +86,29 @@ int neighbour_table_add_entry(
     n_t->neighbours[i].missed_hellos = 0;
 
     n_t->count++;
+
+    return i;
+}
+
+int routing_table_add_entry(
+    struct route_table *r_t,
+    uint8_t dst_mip,
+    uint8_t next_hop,
+    uint8_t cost
+){
+    debugprint("adding route for node %d", dst_mip);
+    int i = r_t->count;
+    
+    //routing table is full
+    if(i == MAX_ROUTES -1){
+        return -1;
+    }
+
+    r_t->routes[i].dst = dst_mip;
+    r_t->routes[i].next_hop = next_hop;
+    r_t->routes[i].cost = cost;
+
+    r_t->count++;
 
     return i;
 }
@@ -114,15 +135,47 @@ void send_hello_message(int socket_unix){
             debugprint("=======================================done=\n");
 }
 
-void send_update_message(int socket_unix){
-            debugprint("=Sending hello message========================");
+void send_update_message(int socket_unix, struct route_table *r_t, uint8_t dst_mip){
+            debugprint("=Sending UPDATE message=======================");
             struct unix_sock_sdu message;
             memset(&message, 0, sizeof(message));
 
-            uint8_t msg[] = ROUTING_UPDATE_MSG; //UPD
+            //first three are UPD
+            uint8_t msg[] = ROUTING_UPDATE_MSG; 
             memcpy(message.payload, msg, sizeof(msg));
 
-            message.mip_addr = 0x00;
+            message.mip_addr = dst_mip;
+
+            int buffer_size = MAX_ROUTES * 3;
+            uint8_t buffer[buffer_size];
+            memset(&buffer, 0, buffer_size);
+
+            int count = 0;
+
+            for(int i = 0; i < r_t->count; i++){
+                struct route r = r_t->routes[i];
+
+                //split horizon: we should not send routes which go through the node we are sending to
+                if(r.dst == dst_mip){
+                    continue;
+                }
+
+                int offset = 1 + 3*i;
+                buffer[offset+0] = r.dst;
+                buffer[offset+1] = r.next_hop;
+                buffer[offset+2] = r.cost;
+                count++;
+            }
+
+            //there werent any routes to update
+            if(count == 0){
+                debugprint("=======================================done=\n");
+                return;
+            }
+
+            buffer[0] = count;
+
+            memcpy(message.payload+3, buffer, buffer_size);
 
             if(send(socket_unix, &message, sizeof(message), 0) == -1){
                 perror("send");
@@ -132,37 +185,56 @@ void send_update_message(int socket_unix){
             debugprint("=======================================done=\n");
 }
 
-void print_tables(struct neighbour_table *n_t, struct route_table *r_t){
+void send_update_messages(
+    int socket_unix, 
+    struct route_table *r_t, 
+    struct neighbour_table *n_t
+){
+    //send an update message to each neighbour
+    for(int i = 0; i < n_t->count; i++){
+        send_update_message(socket_unix, r_t, n_t->neighbours[i].mip_addr);
+    }
+}
+
+void print_neighbour_table(struct neighbour_table *n_t){
     if(get_debug() == 0){
         return;
     }
     printf("neighbours: \n");
     printf("|mip\t|seconds\t|missed \t|state\t|\n");
-    for(int i = 0; (i < MAX_NEIGHBOURS && i < MAX_ROUTES); i++){
-        if(i < MAX_NEIGHBOURS && i < n_t->count){
-            printf("|%d\t|%lo\t\t|%d\t\t|%s\t|\n", 
-                n_t->neighbours[i].mip_addr,
-                time(NULL) - n_t->neighbours[i].last_hello_time,
-                n_t->neighbours[i].missed_hellos,
-                (n_t->neighbours[i].state == CONNECTED) ? "CONNECTED" : "DISCONNECTED"
-            );
-        }
+    for(int i = 0; i < n_t->count; i++){
+        neighbour_t curr_n = n_t->neighbours[i]; //current neighbour
+        printf("|%d\t|%lo\t\t|%d\t\t|%s\t|\n", 
+            curr_n.mip_addr,
+            time(NULL) - curr_n.last_hello_time,
+            curr_n.missed_hellos,
+            (curr_n.state == CONNECTED) ? "CONNECTED" :
+                   (curr_n.state == INIT) ? "INIT" : 
+                   "DISCONNECTED"
+        );
     }
     printf("\n\n");
 }
 
 void check_neighbors(struct neighbour_table *n_table){
-    debugprint("times");
     for(int i = 0; i < n_table->count ; i++){
+        neighbour_t curr_neighbour = n_table->neighbours[i];
+
+        if(curr_neighbour.state == DISCONNECTED){
+            continue;
+        }
+
         long time_diff = time(NULL) - n_table->neighbours[i].last_hello_time;
-        if(time_diff > 15){
-            debugprint("neighbor: %s has not said hello in %lo seconds");
+
+        if(time_diff > DISCONNECTION_TIME_LIMIT){
+            debugprint("neighbor: %d has not said hello in %lo seconds", curr_neighbour.mip_addr, time_diff);
             n_table->neighbours[i].state = DISCONNECTED;
         }
+        //TODO: update routing table with infinity for all the 
     }   
-}
 
-#define EPOLL_MAX_EVENTS 10
+
+}
 
 void routing_daemon(
         int epollfd,
@@ -194,14 +266,17 @@ void routing_daemon(
             }
 
             //print current state
-            print_tables(n_table, r_table);
+            print_neighbour_table(n_table);
+            print_routing_table(r_table);
 
             check_neighbors(n_table);
 
-            if(update_table_changed == 0){
-                send_hello_message(socket_unix);
-            }else{
-                send_update_message(socket_unix);
+            send_hello_message(socket_unix);
+
+            //we only send the update messages if there has been any changes to the table
+            if(update_table_changed != 0){
+                send_update_messages(socket_unix, r_table, n_table);
+                update_table_changed = 0;
             }
 
         }else if(events->data.fd == socket_unix){
@@ -229,6 +304,8 @@ void routing_daemon(
                 if(index == -1){
                     debugprint("%d was not found in n_table, adding it now", recv_sdu.mip_addr);
                     index = neighbour_table_add_entry(n_table, recv_sdu.mip_addr);
+                    routing_table_add_entry(r_table, recv_sdu.mip_addr, recv_sdu.mip_addr, 1);
+                    update_table_changed = 1;
                 }else if(n_table->neighbours[index].state == INIT){
                 //if in list && state == INIT -> set state to CONNECTED
                     n_table->neighbours[index].state = CONNECTED;
@@ -288,11 +365,10 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
-    int timer_interval = 5; //seconds
     struct itimerspec new_value;
-    new_value.it_value.tv_sec = timer_interval; // Initial expiration
+    new_value.it_value.tv_sec = TIMER_INTERVAL; // Initial expiration
     new_value.it_value.tv_nsec = 0;
-    new_value.it_interval.tv_sec = timer_interval; // Interval
+    new_value.it_interval.tv_sec = TIMER_INTERVAL; // Interval
     new_value.it_interval.tv_nsec = 0;
 
     if (timerfd_settime(timerfd, 0, &new_value, NULL) == -1) {

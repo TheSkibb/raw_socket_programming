@@ -1,13 +1,20 @@
+/*
+ * ROUTING:
+ *  Only contains things which are shared between routing_daemon and mip_daemon
+ *  All actual routing logic is contained withing routing_daemon.c
+ */
 #ifndef routing_h
 #define routing_h
 
 #include <stdint.h>
 #include <sys/time.h>
+#include <stdio.h>
+#include "utils.h"
 
 /*
- * below are some messages which can be used as payload in the
- * unix_sock_sdu from the sockets library.
- * NOTICE: some of the messages will need you to 
+ * Message types: 
+ * The message type between the routing daemon and the mip daemon are distinguished from three first characters
+ * NB: Some of the messages will contain more data after the first three characters
  */
 
 // A HELLO message for discovering neighbouring nodes.
@@ -34,5 +41,35 @@
 //   <P (0x50, 8 bits)> 
 //   <next hop MIP address (8 bits)>
 #define ROUTING_RESPONSE_MSG {0x52, 0x53, 0x50, 0xFF} //RSP<mip address>
+                                                      
+/*
+ * Other:
+ */
+
+//We use a uint8_t to represent the cost of routes. 
+//We use 0xFF as infinity, because in our example no route is that long
+#define ROUTING_COST_INFINITY 0xFF
+
+//amount of routes the routing table will hold
+//in this scenario we have 5 nodes, so number of nodes will not exceed 5
+#define MAX_ROUTES 5 
+
+//data structure for storing where to forward packets
+struct route{
+    //mip address
+    uint8_t dst; 
+    //mip address of the node which will forward
+    uint8_t next_hop;
+    //how many hops it takes to get to dst with this route
+    uint8_t cost;
+}__attribute__((packed));
+
+//data structure for storing routes
+struct route_table{
+    struct route routes[MAX_ROUTES];
+    int count;
+}__attribute__((packed));
+
+void print_routing_table(struct route_table *r_t);
 
 #endif //routing_h

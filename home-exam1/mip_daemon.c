@@ -9,6 +9,7 @@
 #include "lib/mip.h"
 #include "lib/utils.h"
 #include "lib/arp_table.h"
+#include "lib/routing.h"
 
 int printhelp(){
     printf("usage mipd [-h] [-d] <socket_upper> <MIP address>\n");
@@ -158,10 +159,11 @@ int mipd(
                 send_mip_route_hello(interfaces);
             }else if(strncmp(router_sdu.payload, "UPD", 3) == 0){
                 debugprint("received UDATE message from router socket");
-                //send update packet with routing table neighbors
+                //send update packet with routing table to neighbors
+                send_mip_route_update(interfaces, &router_sdu, arp_t);
             }else if(strncmp(router_sdu.payload, "RSP", 3) == 0){
-                debugprint("received RESPONSE message from router socket");
                 //search queue for a packet that is to be sent to the dst mip addr in the request
+                debugprint("received RESPONSE message from router socket");
             }
 
             debugprint("======================================router sock handled");

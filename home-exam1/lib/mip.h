@@ -137,5 +137,11 @@ int send_mip_route_hello(
         struct ifs_data *ifs
 );
 
+int send_mip_route_update(
+    struct ifs_data *ifs,
+    struct unix_sock_sdu *router_sdu,
+    struct arp_table *arp_t
+);
+
 #endif
 

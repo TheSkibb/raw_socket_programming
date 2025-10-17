@@ -152,10 +152,15 @@ int handle_mip_route_packet(
         debugprint("no routing_deamon is attached");
         return -1;
     }
+
+    //add the src address to the mip arp table if we dont already have it
+    if(arp_t_get_index_from_mip_addr(arp_t, mip_pdu->mip_hdr.src_addr) == -1){
+        //add to table
+        arp_t_add_entry(arp_t, mip_pdu->mip_hdr.src_addr, received_index, mip_pdu->ethhdr.src_mac);
+    }
+
     if(strncmp((char *)mip_pdu->sdu, "HEL", 3) == 0){
         debugprint("routing message is a HELLO message");
-
-        //add to arp table
 
         //send to unix socket
         struct unix_sock_sdu send_unix;
@@ -480,7 +485,7 @@ int send_mip_arp_response(
 int send_mip_route_hello(
         struct ifs_data *ifs
 ){
-    debugprint("preparing to send mip arp request\n");
+    debugprint("preparing to send mip hello packet \n");
 
     uint8_t eth_broadcast[] = ETH_BROADCAST;
     uint8_t mip_broadcast = 0xFF;
@@ -491,7 +496,7 @@ int send_mip_route_hello(
 
     //TODO: send on all interfaces
     for(int i = 0; i < ifs->ifn; i++){
-        debugprint("sending mip request %d / %d", i+1, ifs->ifn);
+        debugprint("sending HELLO %d / %d", i+1, ifs->ifn);
         rc = send_mip_packet(
             ifs,
             i,
@@ -507,5 +512,27 @@ int send_mip_route_hello(
             exit(EXIT_FAILURE);
         }
     }
+    return 0;
+}
+
+int send_mip_route_update(
+    struct ifs_data *ifs,
+    struct unix_sock_sdu *router_sdu,
+    struct arp_table *arp_t
+){
+    //create a route_table from payload
+    
+    int offset = 3; //(first 3 entries are UPD)
+    struct route_table r_t;
+    //first entry is the count
+    r_t.count = router_sdu->payload[offset]; 
+    debugprint("routing table to be sent to: %d", router_sdu->mip_addr);
+    debugprint("count is %d", r_t.count);
+    //copy the rest of the payload
+    memcpy(&r_t.routes, router_sdu->payload+offset+1, MAX_ROUTES*3);
+    print_routing_table(&r_t);
+    
+    //int rc = send_mip_packet();
+
     return 0;
 }
