@@ -135,23 +135,30 @@ void send_hello_message(int socket_unix){
             debugprint("=======================================done=\n");
 }
 
-void send_update_message(int socket_unix, struct route_table *r_t, uint8_t dst_mip){
+//send an update message:
+//this function sends a subset of the host routing table
+//(see split horizon)
+void send_update_message(
+    int socket_unix, 
+    //route_table of host (a subset of this will be send)
+    struct route_table *r_t, 
+    //destination node to send the update message to
+    uint8_t dst_mip
+){
             debugprint("=Sending UPDATE message=======================");
             struct unix_sock_sdu message;
             memset(&message, 0, sizeof(message));
 
-            //first three are UPD
+            //first three bytes of sdu are "UPD"
             uint8_t msg[] = ROUTING_UPDATE_MSG; 
             memcpy(message.payload, msg, sizeof(msg));
 
             message.mip_addr = dst_mip;
 
-            int buffer_size = MAX_ROUTES * 3;
-            uint8_t buffer[buffer_size];
-            memset(&buffer, 0, buffer_size);
+            struct route_table send_r_t;
+            memset(&send_r_t, 0, sizeof(struct route_table));
 
-            int count = 0;
-
+            //check what routes we should send
             for(int i = 0; i < r_t->count; i++){
                 struct route r = r_t->routes[i];
 
@@ -160,22 +167,26 @@ void send_update_message(int socket_unix, struct route_table *r_t, uint8_t dst_m
                     continue;
                 }
 
-                int offset = 1 + 3*i;
-                buffer[offset+0] = r.dst;
-                buffer[offset+1] = r.next_hop;
-                buffer[offset+2] = r.cost;
-                count++;
+                send_r_t.routes[send_r_t.count].dst = r_t->routes[i].dst;
+                send_r_t.routes[send_r_t.count].next_hop = r_t->routes[i].next_hop;
+                send_r_t.routes[send_r_t.count].cost = r_t->routes[i].cost;
+
+                send_r_t.count++;
             }
 
             //there werent any routes to update
-            if(count == 0){
+            if(send_r_t.count == 0){
+                debugprint("there were no routes to send");
                 debugprint("=======================================done=\n");
                 return;
             }
 
-            buffer[0] = count;
+            //routing table to send
+            print_routing_table(&send_r_t);
 
-            memcpy(message.payload+3, buffer, buffer_size);
+            //put the route_table in the payload
+            //(offset by 3 to not overwrite the sdu type
+            memcpy(message.payload+3, (void *)&send_r_t, sizeof(struct route_table));
 
             if(send(socket_unix, &message, sizeof(message), 0) == -1){
                 perror("send");
@@ -229,8 +240,9 @@ void check_neighbors(struct neighbour_table *n_table){
         if(time_diff > DISCONNECTION_TIME_LIMIT){
             debugprint("neighbor: %d has not said hello in %lo seconds", curr_neighbour.mip_addr, time_diff);
             n_table->neighbours[i].state = DISCONNECTED;
+            //TODO: update routing table with infinity for all the 
+
         }
-        //TODO: update routing table with infinity for all the 
     }   
 }
 
@@ -262,13 +274,83 @@ int handle_hello_message(
     return 0;
 }
 
+//compares and updates the host_routing_table if:
+//  the new_routing_table contains a new route
+//  the cost of an existing route has changed either up or down
+//  new_routing_table contains route to a known dst with a different next_hop (if this route is cheaper)
+int compare_routing_tables(
+    //route_table of this node
+    struct route_table *host_routing_table,
+    //route_table we have received
+    struct route_table *new_routing_table,
+    //mip address of the node we received the table from
+    uint8_t remote_node
+){
+
+    debugprint("comparing routing tables...");
+
+    debugprint("host_routing_table has %d routes", host_routing_table->count);
+    debugprint("new_routing_table has %d routes", new_routing_table->count);
+
+    for(int i = 0; i < new_routing_table->count; i++){
+        debugprint("incoming route %d: { %d %d %d}", i,
+                new_routing_table->routes[i].dst,
+                new_routing_table->routes[i].next_hop,
+                new_routing_table->routes[i].cost);
+        int is_new_route = 1;
+
+        //check if there is a route on this nodes routing table which has the same destination
+        for(int j = 0; j<host_routing_table->count; j++){
+            debugprint("->comparing with host route %d: { %d %d %d}", j,
+                    host_routing_table->routes[j].dst,
+                    host_routing_table->routes[j].next_hop,
+                    host_routing_table->routes[j].cost);
+            if(new_routing_table->routes[i].dst == host_routing_table->routes[j].dst){
+                is_new_route = 0;
+            }
+        }
+
+        if(is_new_route){
+            //new routes should be added to the routing table
+            debugprint("this is a NEW route!");
+            routing_table_add_entry(
+                host_routing_table,
+                new_routing_table->routes[i].dst,
+                remote_node,
+                new_routing_table->routes[i].cost+1
+            );
+        }else{
+            debugprint("this is NOT a new route!");
+        }
+    }
+    return 0;
+}
+
+//unpacks a unix_sock_sdu update message.
+//compares the contents of the received table, 
+//and checks whether to update any routes in the local routing table
+//if any routes are changed, 
 int handle_update_message(
+        //this nodes neighbour table
         struct neighbour_table *n_table,
+        //this nodes routing table
         struct route_table *r_table,
+        //update sdu
         struct unix_sock_sdu *recv_sdu,
         int *update_table_changed
 ){
-    debugprint("RECEIVED A ROUTING TABLE UPDATE");
+    debugprint("RECEIVED A ROUTING TABLE UPDATE FROM %d:", recv_sdu->mip_addr);
+
+    //unpack the sdu into a new routing table
+    int offset = 3;
+    struct route_table r_t;
+    memset(&r_t, 0, sizeof(struct route_table));
+    r_t.count = recv_sdu->payload[offset];
+    memcpy(r_t.routes, recv_sdu->payload+offset+1, MAX_ROUTES*3);
+
+    print_routing_table(&r_t);
+    compare_routing_tables(r_table, &r_t, recv_sdu->mip_addr);
+
     return 0;
 }
 

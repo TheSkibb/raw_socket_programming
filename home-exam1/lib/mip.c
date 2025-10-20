@@ -178,11 +178,21 @@ int handle_mip_route_packet(
 
     }else if(strncmp((char *)mip_pdu->sdu, "UPD", 3) == 0){
         debugprint("routing message is a UPDATE message, sending down to unix socket");
-        //send to unix socket
+
+        //create sdu to send over unix socket
         struct unix_sock_sdu send_unix;
         memset(&send_unix, 0, sizeof(struct unix_sock_sdu));
-        uint8_t msg[] = ROUTING_UPDATE_MSG;
-        memcpy(send_unix.payload, msg, sizeof(msg));
+
+        memcpy(send_unix.payload, mip_pdu->sdu, BUFFER_SIZE);
+
+        debugprint("there is %d route. dst: %d, n_h: %d, c: %d", 
+            send_unix.payload[3],
+            send_unix.payload[4],
+            send_unix.payload[5],
+            send_unix.payload[6]
+        );
+
+
         send_unix.mip_addr = mip_pdu->mip_hdr.src_addr;
        
         int w = write(ifs->rusock, &send_unix, sizeof(struct unix_sock_sdu));

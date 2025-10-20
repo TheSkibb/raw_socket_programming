@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+
 #include "utils.h"
 
 #include "routing.h"
@@ -9,7 +11,7 @@ void print_routing_table(struct route_table *r_t){
         return;
     }
 
-    printf("routes:\n");
+    printf("routes: %d\n", r_t->count);
     printf("|dst\t|next_hop\t|cost\t|\n");
     for(int i = 0; i < r_t->count; i++){
         struct route curr_r = r_t->routes[i]; //current route
@@ -18,8 +20,9 @@ void print_routing_table(struct route_table *r_t){
                 curr_r.next_hop,
                 curr_r.cost
         );
-
+        if(i > MAX_ROUTES){
+            debugprint("too many routes... input is probably wrong");
+        }
     }
     printf("\n\n");
 }
-

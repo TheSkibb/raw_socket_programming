@@ -66,8 +66,8 @@ struct route{
 
 //data structure for storing routes
 struct route_table{
+    uint8_t count;
     struct route routes[MAX_ROUTES];
-    int count;
 }__attribute__((packed));
 
 void print_routing_table(struct route_table *r_t);
