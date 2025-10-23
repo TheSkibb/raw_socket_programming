@@ -20,10 +20,13 @@
 #define MAX_NEIGHBOURS 5
 
 //time interval between sending hello/update messages
-#define TIMER_INTERVAL 5 
+#define TIMER_INTERVAL 3
+
+//number of hellos to send before sending an update message
+#define NO_UPDATE_COUNT_LIMIT 2
 
 //how many seconds can go since last hello before node is disconnected
-#define DISCONNECTION_TIME_LIMIT 5 * TIMER_INTERVAL 
+#define DISCONNECTION_TIME_LIMIT 3 * TIMER_INTERVAL 
 #define EPOLL_MAX_EVENTS 10
 
 //Data structures local to only routing_deamon
@@ -96,6 +99,7 @@ int routing_table_add_entry(
     uint8_t next_hop,
     uint8_t cost
 ){
+
     debugprint("adding route for node %d", dst_mip);
     int i = r_t->count;
     
@@ -162,8 +166,8 @@ void send_update_message(
             for(int i = 0; i < r_t->count; i++){
                 struct route r = r_t->routes[i];
 
-                //split horizon: we should not send routes which go through the node we are sending to
-                if(r.dst == dst_mip){
+                //split horizon: we should not send routes which go through or to the node we are sending to
+                if(r.next_hop == dst_mip || r.dst == dst_mip){
                     continue;
                 }
 
@@ -212,13 +216,12 @@ void print_neighbour_table(struct neighbour_table *n_t){
         return;
     }
     printf("neighbours: \n");
-    printf("|mip\t|seconds\t|missed \t|state\t|\n");
+    printf("|mip\t|seconds\t|state\t|\n");
     for(int i = 0; i < n_t->count; i++){
         neighbour_t curr_n = n_t->neighbours[i]; //current neighbour
-        printf("|%d\t|%lo\t\t|%d\t\t|%s\t|\n", 
+        printf("|%d\t|%lo\t\t|%s\t|\n", 
             curr_n.mip_addr,
             time(NULL) - curr_n.last_hello_time,
-            curr_n.missed_hellos,
             (curr_n.state == CONNECTED) ? "CONNECTED" :
                    (curr_n.state == INIT) ? "INIT" : 
                    "DISCONNECTED"
@@ -227,7 +230,23 @@ void print_neighbour_table(struct neighbour_table *n_t){
     printf("\n\n");
 }
 
-void check_neighbors(struct neighbour_table *n_table){
+void poison_reverse(struct route_table *r_table, uint8_t dst){
+    for(int i = 0; i < r_table->count; i++){
+        if(r_table->routes[i].next_hop == dst){
+            r_table->routes[i].cost = ROUTING_COST_INFINITY;
+        }
+    }
+}
+
+void reverse_poison_reverse(struct route_table *r_table, uint8_t dst){
+    for(int i = 0; i < r_table->count; i++){
+        if(r_table->routes[i].dst == dst){
+            r_table->routes[i].cost = 1;
+        }
+    }
+}
+
+void check_neighbors(struct neighbour_table *n_table, struct route_table *r_table, int *update_table_changed){
     for(int i = 0; i < n_table->count ; i++){
         neighbour_t curr_neighbour = n_table->neighbours[i];
 
@@ -241,32 +260,45 @@ void check_neighbors(struct neighbour_table *n_table){
             debugprint("neighbor: %d has not said hello in %lo seconds", curr_neighbour.mip_addr, time_diff);
             n_table->neighbours[i].state = DISCONNECTED;
             //TODO: update routing table with infinity for all the 
-
+            poison_reverse(r_table, n_table->neighbours[i].mip_addr);
+            *update_table_changed = 0;
         }
     }   
 }
 
+// 
 int handle_hello_message(
+        //this nodes list of neighbours
         struct neighbour_table *n_table,
+        //this nodes list of routes
         struct route_table *r_table,
+        //hello packet from unix socket
         struct unix_sock_sdu *recv_sdu,
+        //pointer to changed_variable to signify if the routing table was changed
         int *update_table_changed
 ){
     //check neighbour list
     int index = find_neighbour_by_addr(n_table, recv_sdu->mip_addr);
 
-    //if not in neighbour list -> add, in state INIT
+    //if not in neighbour list -> add to neightbor list in state INIT, add to route_table
     if(index == -1){
+
         debugprint("%d was not found in n_table, adding it now", recv_sdu->mip_addr);
         index = neighbour_table_add_entry(n_table, recv_sdu->mip_addr);
         routing_table_add_entry(r_table, recv_sdu->mip_addr, recv_sdu->mip_addr, 1);
+
+        //this will make the routing daemon send out a update message
         *update_table_changed = 1;
+
+    //if in list and state == INIT -> set to CONNECTED
     }else if(n_table->neighbours[index].state == INIT){
-    //if in list && state == INIT -> set state to CONNECTED
         n_table->neighbours[index].state = CONNECTED;
-    }else if(n_table->neighbours[index].state == DISCONNECTED){
+
     //if in list && state == DISCONNECTED -> set state to CONNECTED
+    }else if(n_table->neighbours[index].state == DISCONNECTED){
         n_table->neighbours[index].state = CONNECTED;
+        //TODO: set cost back from infinity
+        reverse_poison_reverse(r_table, n_table->neighbours[index].mip_addr);
     }
 
     n_table->neighbours[index].last_hello_time = time(NULL);
@@ -299,14 +331,17 @@ int compare_routing_tables(
                 new_routing_table->routes[i].cost);
         int is_new_route = 1;
 
+        int j = 0;
+
         //check if there is a route on this nodes routing table which has the same destination
-        for(int j = 0; j<host_routing_table->count; j++){
+        for(j = 0; j < host_routing_table->count; j++){
             debugprint("->comparing with host route %d: { %d %d %d}", j,
                     host_routing_table->routes[j].dst,
                     host_routing_table->routes[j].next_hop,
                     host_routing_table->routes[j].cost);
             if(new_routing_table->routes[i].dst == host_routing_table->routes[j].dst){
                 is_new_route = 0;
+                break;
             }
         }
 
@@ -320,7 +355,31 @@ int compare_routing_tables(
                 new_routing_table->routes[i].cost+1
             );
         }else{
-            debugprint("this is NOT a new route!");
+            debugprint("this is NOT a new destination!");
+
+            //uint8_t host_dst = host_routing_table->routes[j].dst;
+            uint8_t host_nxt_hop = host_routing_table->routes[j].next_hop;
+            uint8_t host_cost = host_routing_table->routes[j].cost;
+
+            //uint8_t recv_dst = new_routing_table->routes[i].dst;
+            uint8_t recv_nxt_hop = new_routing_table->routes[i].next_hop;
+            uint8_t recv_cost = new_routing_table->routes[i].cost;
+
+            if(host_nxt_hop == recv_nxt_hop && host_cost != recv_cost){
+                debugprint("updating routing cost");
+                if(recv_cost != ROUTING_COST_INFINITY){
+                    host_routing_table->routes[j].cost = recv_cost + 1;
+                }else{
+                    host_routing_table->routes[j].cost = ROUTING_COST_INFINITY;
+                }
+            }
+            //check if you receive a route which is cheaper (with different next hop)
+            else if(host_cost > recv_cost){
+                debugprint("received route is cheaper");
+                host_routing_table->routes[j].dst = new_routing_table->routes[i].dst;
+                host_routing_table->routes[j].next_hop = remote_node;
+                host_routing_table->routes[j].cost = new_routing_table->routes[i].cost + 1;
+            }
         }
     }
     return 0;
@@ -354,6 +413,36 @@ int handle_update_message(
     return 0;
 }
 
+int handle_forwarding_packet(
+        //sdu received on unix socket
+        struct unix_sock_sdu *sdu,
+        //route_table of this node
+        struct route_table *r_t,
+        int socket_unix
+){
+    debugprint("=Handling forwarding========================\n");
+    for(int i = 0; i < r_t->count; i++){
+        if(r_t->routes[i].dst == sdu->payload[4]){
+            debugprint("found a matching route");
+            sdu->payload[4] = r_t->routes[i].next_hop;
+            sdu->TTL = sdu->TTL - 1;
+            break;
+        }
+    }
+
+    //send sdu back on unix socket
+    int rc = write(socket_unix, sdu, 0);
+
+    if(rc == -1){
+        perror("sendmsg");
+        exit(EXIT_FAILURE);
+    }
+
+    debugprint("=======================================done=\n");
+
+    return 0;
+}
+
 void routing_daemon(
         int epollfd,
         struct epoll_event events[EPOLL_MAX_EVENTS],
@@ -364,6 +453,7 @@ void routing_daemon(
 ){
     int rc;
     int update_table_changed = 0;
+    int no_new_update_count;
     uint64_t missed;
     while(1){
         rc = epoll_wait(epollfd, events, EPOLL_MAX_EVENTS, -1);
@@ -383,19 +473,24 @@ void routing_daemon(
                 exit(EXIT_FAILURE);
             }
 
-            //print current state
+            debugprint("CURRENT STATE");
             print_neighbour_table(n_table);
             print_routing_table(r_table);
 
-            check_neighbors(n_table);
+            check_neighbors(n_table, r_table, &update_table_changed);
 
             send_hello_message(socket_unix);
 
-            //we only send the update messages if there has been any changes to the table
-            if(update_table_changed != 0){
+            //we send the update messages if there has been any changes to the table
+            //or if there hasnt been any update in some amount of hellos
+            if(update_table_changed != 0 || no_new_update_count == NO_UPDATE_COUNT_LIMIT){
                 send_update_messages(socket_unix, r_table, n_table);
                 update_table_changed = 0;
+                no_new_update_count = 0;
+            }else{
+                no_new_update_count++;
             }
+
 
         }else if(events->data.fd == socket_unix){
             debugprint("=Received a unix message======================");
@@ -429,6 +524,13 @@ void routing_daemon(
                         &update_table_changed
                 );
                 
+            }else if(strncmp(recv_sdu.payload, "REQ", 3) == 0){
+                debugprint("forwarding REQUEST for %d");
+                handle_forwarding_packet(
+                        &recv_sdu,
+                        r_table,
+                        socket_unix
+                );
             }else{
                 debugprint("message: %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
             }

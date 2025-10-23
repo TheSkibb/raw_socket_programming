@@ -40,11 +40,11 @@
 //   <S (0x53, 8 bits)> 
 //   <P (0x50, 8 bits)> 
 //   <next hop MIP address (8 bits)>
-#define ROUTING_RESPONSE_MSG {0x52, 0x53, 0x50, 0xFF} //RSP<mip address>
+#define ROUTING_RESPONSE_MSG {0x51, 0x53, 0x50, 0xFF} //RSP<mip address>
                                                       
 /*
  * Other:
- */
+*/
 
 //We use a uint8_t to represent the cost of routes. 
 //We use 0xFF as infinity, because in our example no route is that long

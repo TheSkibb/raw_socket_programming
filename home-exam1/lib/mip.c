@@ -13,7 +13,16 @@
 #include "arp_table.h"
 #include "sockets.h"
 #include "routing.h"
+#include "queue.h"
 
+int send_forward_request(
+        struct ifs_data *ifs,
+        //mip address we want to get the next hop for
+        uint8_t mip_addr
+){
+    //send a sdu to the unix socket
+    return 0;
+}
 
 int forward_mip_packet(
         struct ifs_data *ifs,
@@ -255,6 +264,7 @@ int handle_mip_arp_packet(
         uint8_t eth_broadcast[] = ETH_BROADCAST;
 
         //forward mip arp request on all interfaces (except the one it was received on)
+        //here, we dont need to ask the routing_deamon about where to forward it
         for(int i = 0; i < ifs->ifn; i++){
             if(i != received_index){
                 forward_mip_packet(
@@ -340,7 +350,8 @@ int handle_mip_packet(
         struct unix_sock_sdu *sdu,
         int socket_unix,
         struct pdu *mip_pdu,
-        int received_index
+        int received_index,
+        struct queue *forwarding_queue
 ){
 
     //mip arp handling
@@ -531,8 +542,8 @@ int send_mip_route_hello(
         );
 
         if(rc < 1){
-            printf("epic fail :(\n");
-            exit(EXIT_FAILURE);
+            debugprint("COULD not send HELLO to interface %d", i);
+            //exit(EXIT_FAILURE);
         }
     }
     return 0;

@@ -9,7 +9,7 @@
 #include "lib/mip.h"
 #include "lib/utils.h"
 #include "lib/arp_table.h"
-#include "lib/routing.h"
+#include "lib/queue.h"
 
 int printhelp(){
     printf("usage mipd [-h] [-d] <socket_upper> <MIP address>\n");
@@ -22,7 +22,8 @@ int mipd(
         int epollfd,
         struct arp_table *arp_t,
         int socket_raw,
-        int socket_unix
+        int socket_unix,
+        struct queue *forward_queue
 ){
     int rc = 0;
     //global message to send
@@ -71,7 +72,7 @@ int mipd(
             );
 
             debugprint("attempting to handle on unix socket");
-            handle_mip_packet(interfaces, arp_t, &sdu, socket_data, &mip_pdu, received_index);
+            handle_mip_packet(interfaces, arp_t, &sdu, socket_data, &mip_pdu, received_index, forward_queue);
             debugprint("===========================================end raw sock=");
         }
         
@@ -98,7 +99,6 @@ int mipd(
                 interfaces->rusock = socket_data;
             }
             debugprint("the socket is of type: %d", identifier);
-
 
             add_socket_to_epoll(epollfd, socket_data, EPOLLIN );
             debugprint("==========================================end unix sock=");
@@ -242,6 +242,12 @@ int main(int argc, char *argv[]){
     debugprint("=initialize arp table=======================");
     struct arp_table arp_t;
     debugprint("=======================================done=");
+
+    debugprint("=initialize forward queue===================");
+    struct queue forward_queue;
+    memset(&forward_queue, 0, sizeof(struct queue));
+    debugprint("=======================================done=");
+
     debugprint("=setup done, starting mip_daemon process====\n\n\n\n\n\n");
 
     mipd(
@@ -249,6 +255,7 @@ int main(int argc, char *argv[]){
         epollfd,
         &arp_t,
         socket_raw,
-        socket_unix
+        socket_unix,
+        &forward_queue
     );
 }

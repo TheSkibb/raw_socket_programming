@@ -7,6 +7,7 @@
 #include "interfaces.h"
 #include "arp_table.h"
 #include "sockets.h"
+#include "queue.h"
 
 //MIP types
 #define MIP_TYPE_ARP 0x01
@@ -114,7 +115,8 @@ int handle_mip_packet(
     struct unix_sock_sdu *sdu,
     int socket_unix,
     struct pdu *mip_pdu,
-    int received_index
+    int received_index,
+    struct queue *forwarding_queue
 );
 
 //send a mip arp package
