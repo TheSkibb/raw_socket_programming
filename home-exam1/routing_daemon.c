@@ -93,10 +93,15 @@ int neighbour_table_add_entry(
     return i;
 }
 
+//add a new route to the route table
 int routing_table_add_entry(
     struct route_table *r_t,
+    //destination of route
     uint8_t dst_mip,
+    //where to forward packets for this destination
     uint8_t next_hop,
+    //cost of new route 
+    //(since all links have cost 1 in out example, this is equivalent to amount of hops)
     uint8_t cost
 ){
 
@@ -117,6 +122,8 @@ int routing_table_add_entry(
     return i;
 }
 
+//get the index of a destination in the routing table
+//returns -1 if destination is not found
 int routing_table_get_route_by_dst(struct route_table *r_t, uint8_t dst){
 
     for(int i = 0; i < r_t->count; i++){
@@ -132,6 +139,7 @@ void print_usage(){
     printf("./routing_daemon <socket_lower>\n");
 }
 
+//send a hello message on unix socket
 void send_hello_message(int socket_unix){
             debugprint("=Sending hello message========================");
             struct unix_sock_sdu message;
@@ -150,17 +158,17 @@ void send_hello_message(int socket_unix){
             debugprint("=======================================done=\n");
 }
 
-//send an update message:
-//this function sends a subset of the host routing table
-//(see split horizon)
+//send a subset of the routing table to a destination
 void send_update_message(
     int socket_unix, 
     //route_table of host (a subset of this will be send)
     struct route_table *r_t, 
     //destination node to send the update message to
+    //no routes which go through this node will be sent
     uint8_t dst_mip
 ){
             debugprint("=Sending UPDATE message=======================");
+            //prepare sdu
             struct unix_sock_sdu message;
             memset(&message, 0, sizeof(message));
 
@@ -197,7 +205,7 @@ void send_update_message(
             }
 
             //routing table to send
-            print_routing_table(&send_r_t);
+            //print_routing_table(&send_r_t);
 
             //put the route_table in the payload
             //(offset by 3 to not overwrite the sdu type
@@ -211,6 +219,7 @@ void send_update_message(
             debugprint("=======================================done=\n");
 }
 
+//send a update message to each neighbour
 void send_update_messages(
     int socket_unix, 
     struct route_table *r_t, 
@@ -223,9 +232,6 @@ void send_update_messages(
 }
 
 void print_neighbour_table(struct neighbour_table *n_t){
-    if(get_debug() == 0){
-        return;
-    }
     printf("neighbours: \n");
     printf("|mip\t|seconds\t|state\t|\n");
     for(int i = 0; i < n_t->count; i++){
@@ -241,6 +247,15 @@ void print_neighbour_table(struct neighbour_table *n_t){
     printf("\n\n");
 }
 
+void print_current_status(struct neighbour_table *n_t, struct route_table *r_t){
+    printf("=CURRENT STATE==============================\n");
+            print_neighbour_table(n_t);
+            print_routing_table(r_t);
+    printf("=======================================done=\n");
+}
+
+//when a node is disconnected we should set the route cost to be infinity
+//this way, other nodes will choose a different (cheaper) path 
 void poison_reverse(struct route_table *r_table, uint8_t dst){
     for(int i = 0; i < r_table->count; i++){
         if(r_table->routes[i].next_hop == dst){
@@ -249,6 +264,9 @@ void poison_reverse(struct route_table *r_table, uint8_t dst){
     }
 }
 
+//check if we have not received a HELLO message from any of the neighbours in n_table
+//if no HELLO message has been received in DISCONNECTION_TIME_LIMIT, the node is disconnected 
+//and route cost set to infinity (poison_reverse)
 void check_neighbours(struct neighbour_table *n_table, struct route_table *r_table, int *routing_table_changed){
     for(int i = 0; i < n_table->count ; i++){
         neighbour_t curr_neighbour = n_table->neighbours[i];
@@ -260,15 +278,15 @@ void check_neighbours(struct neighbour_table *n_table, struct route_table *r_tab
         long time_diff = time(NULL) - n_table->neighbours[i].last_hello_time;
 
         if(time_diff > DISCONNECTION_TIME_LIMIT){
-            debugprint("neighbour: %d has not said hello in %lo seconds", curr_neighbour.mip_addr, time_diff);
+            debugprint("neighbour: %d has not said hello in %lo seconds. %d will be DISCONNECTED", curr_neighbour.mip_addr, time_diff, curr_neighbour.mip_addr);
             n_table->neighbours[i].state = DISCONNECTED;
             poison_reverse(r_table, n_table->neighbours[i].mip_addr);
-            *routing_table_changed = 0;
+            *routing_table_changed = 1;
         }
     }   
 }
 
-// checks if a hello message for different cases:
+// when we receive a HELLO message there are three different cases to handle:
 // 1: if not in neighbour list -> add to neightbor list in state INIT, add to route_table
 // 2: if in list and state == INIT -> set to CONNECTED
 // 3: if in list && state == DISCONNECTED -> set state to CONNECTED
@@ -285,7 +303,7 @@ int handle_hello_message(
     //check neighbour list
     int index = find_neighbour_by_addr(n_table, recv_sdu->mip_addr);
 
-    //1.
+    //case 1.
     if(index == -1){
 
         debugprint("%d was not found in n_table, adding it now", recv_sdu->mip_addr);
@@ -295,11 +313,11 @@ int handle_hello_message(
         //this will make the routing daemon send out a update message
         *routing_table_changed = 1;
 
-    //2.
+    //case 2.
     }else if(n_table->neighbours[index].state == INIT){
         n_table->neighbours[index].state = CONNECTED;
 
-    //3.
+    // case 3.
     }else if(n_table->neighbours[index].state == DISCONNECTED){
         n_table->neighbours[index].state = CONNECTED;
         
@@ -343,20 +361,24 @@ int compare_routing_tables(
     debugprint("new_routing_table has %d routes", new_routing_table->count);
 
     for(int i = 0; i < new_routing_table->count; i++){
+        /*
         debugprint("incoming route %d: { %d %d %d}", i,
                 new_routing_table->routes[i].dst,
                 new_routing_table->routes[i].next_hop,
                 new_routing_table->routes[i].cost);
+        */
         int is_new_route = 1;
 
         int j = 0;
 
         //check if there is a route on this nodes routing table which has the same destination
         for(j = 0; j < host_routing_table->count; j++){
+            /*
             debugprint("->comparing with host route %d: { %d %d %d}", j,
                     host_routing_table->routes[j].dst,
                     host_routing_table->routes[j].next_hop,
                     host_routing_table->routes[j].cost);
+            */
             if(new_routing_table->routes[i].dst == host_routing_table->routes[j].dst){
                 is_new_route = 0;
                 break;
@@ -365,7 +387,7 @@ int compare_routing_tables(
 
         if(is_new_route){
             //new routes should be added to the routing table
-            debugprint("this is a NEW route!");
+            debugprint("adding NEW route with dst: %d!", new_routing_table->routes[i].dst);
             routing_table_add_entry(
                 host_routing_table,
                 new_routing_table->routes[i].dst,
@@ -373,19 +395,16 @@ int compare_routing_tables(
                 new_routing_table->routes[i].cost+1
             );
         }else{
-            debugprint("this is NOT a new destination!");
-
-            //uint8_t host_dst = host_routing_table->routes[j].dst;
+            uint8_t host_dst = host_routing_table->routes[j].dst;
             uint8_t host_nxt_hop = host_routing_table->routes[j].next_hop;
             uint8_t host_cost = host_routing_table->routes[j].cost;
 
-            //uint8_t recv_dst = new_routing_table->routes[i].dst;
-            //uint8_t recv_nxt_hop = new_routing_table->routes[i].next_hop;
+            uint8_t recv_nxt_hop = new_routing_table->routes[i].next_hop;
             uint8_t recv_cost = new_routing_table->routes[i].cost;
             
             //check if a path we already have has an updated cost
             if(host_nxt_hop == remote_node && host_cost != recv_cost){
-                debugprint("updating routing cost");
+                debugprint("updating routing cost for dst %d, from %d to %d", host_dst, host_cost, recv_cost);
                 if(recv_cost != ROUTING_COST_INFINITY){
                     host_routing_table->routes[j].cost = recv_cost + 1;
                 }else{
@@ -394,7 +413,7 @@ int compare_routing_tables(
             }
             //check if you receive a route which is cheaper (with different next hop)
             else if(host_cost > recv_cost+1){
-                debugprint("received route is cheaper");
+                debugprint("received cheaper route for %d, cost %d -> %d next_hop %d -> %d", host_dst, host_cost, recv_cost, host_nxt_hop, recv_nxt_hop);
                 host_routing_table->routes[j].dst = new_routing_table->routes[i].dst;
                 host_routing_table->routes[j].next_hop = remote_node;
                 host_routing_table->routes[j].cost = new_routing_table->routes[i].cost + 1;
@@ -417,7 +436,7 @@ int handle_update_message(
         struct unix_sock_sdu *recv_sdu,
         int *routing_table_changed
 ){
-    debugprint("RECEIVED A ROUTING TABLE UPDATE FROM %d:", recv_sdu->mip_addr);
+    debugprint("received a UPDATE message from %d:", recv_sdu->mip_addr);
 
     //unpack the sdu into a new routing table
     int offset = 3;
@@ -426,12 +445,13 @@ int handle_update_message(
     r_t.count = recv_sdu->payload[offset];
     memcpy(r_t.routes, recv_sdu->payload+offset+1, MAX_ROUTES*3);
 
-    print_routing_table(&r_t);
     compare_routing_tables(r_table, &r_t, recv_sdu->mip_addr);
 
     return 0;
 }
 
+//finds the next hop for the packet
+//creates a new packet which is written back to the unix socket
 int handle_forwarding_packet(
         //sdu received on unix socket
         struct unix_sock_sdu *sdu,
@@ -462,6 +482,7 @@ int handle_forwarding_packet(
     return 0;
 }
 
+//starts the routing deamon
 void routing_daemon(
         int epollfd,
         struct epoll_event events[EPOLL_MAX_EVENTS],
@@ -492,9 +513,7 @@ void routing_daemon(
                 exit(EXIT_FAILURE);
             }
 
-            debugprint("CURRENT STATE");
-            print_neighbour_table(n_table);
-            print_routing_table(r_table);
+            print_current_status(n_table, r_table);
 
             //check if any neighbours have disconnected
             check_neighbours(n_table, r_table, &routing_table_changed);
@@ -561,7 +580,7 @@ void routing_daemon(
 }
 
 int main(int argc, char *argv[]){
-    set_debug(1);
+    //set_debug(1); //uncomment to get debug logs
     debugprint("=checking cmd arguments=====================");
     if(argc <= 1){
         printf("too few arguments");

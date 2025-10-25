@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "utils.h"
 
@@ -7,10 +6,6 @@
 
 //utility for pretty printing the routing table
 void print_routing_table(struct route_table *r_t){
-    if(get_debug() == 0){
-        return;
-    }
-
     printf("routes: %d\n", r_t->count);
     printf("|dst\t|next_hop\t|cost\t|\n");
     for(int i = 0; i < r_t->count; i++){
