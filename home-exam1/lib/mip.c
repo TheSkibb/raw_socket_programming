@@ -18,9 +18,30 @@
 int send_forward_request(
         struct ifs_data *ifs,
         //mip address we want to get the next hop for
-        uint8_t mip_addr
+        uint8_t mip_addr,
+        uint8_t TTL
 ){
+    //create unix sdu
+    struct unix_sock_sdu sdu;
+    memset(&sdu, 0, sizeof(struct unix_sock_sdu));
+
+    //set contents
+    sdu.mip_addr = ifs->mip_addr;
+    sdu.TTL = TTL;
+    uint8_t request[] = ROUTING_REQUEST_MSG;
+    request[3] = mip_addr;
+    memcpy(sdu.payload, request, 4);
+
+    debugprint("sending forwarding request for %d, TTL: %d", sdu.payload[3], sdu.TTL);
+
     //send a sdu to the unix socket
+    int w = write(ifs->rusock, &sdu, sizeof(struct unix_sock_sdu));
+    if(w <= 0){
+        perror("write");
+        exit(EXIT_FAILURE);
+    }
+
+
     return 0;
 }
 

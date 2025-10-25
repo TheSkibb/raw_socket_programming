@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 
 #include "arp_table.h"
 
@@ -26,4 +27,11 @@ int arp_t_get_index_from_mip_addr(
         }
     }
     return -1;
+}
+
+void arp_t_print_contents(struct arp_table *arp_t){
+    printf("| mip\t| ifindex\t|\n");
+    for(int i = 0; i < arp_t->arp_table_n; i++){
+        printf("| %d\t | %d\t|\n", arp_t->mip_addr[i], arp_t->sll_ifindex[i]);
+    }
 }

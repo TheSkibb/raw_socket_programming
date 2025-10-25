@@ -94,15 +94,6 @@ int recv_mip_packet(
     int *out_received_index
 );
 
-//reads from ifs.rsock and puts the contents into the
-/*
-int recv_mip_packet(
-    struct ifs_data *ifs,
-    struct arp_table *arp_t,
-    struct unix_sock_sdu *sdu
-);
-*/
-
 //the handle_mip_packet does different things based on the received packet
 //if MIP_TYPE_ARP && MIP_ARP_TYPE_REQUEST -> save in arp cache and send_mip_arp_response
 //if MIP_TYPE_ARP && MIP_ARP_TYPE_RESPONSE -> save in arp cache,
@@ -143,6 +134,13 @@ int send_mip_route_update(
     struct ifs_data *ifs,
     struct unix_sock_sdu *router_sdu,
     struct arp_table *arp_t
+);
+
+int send_forward_request(
+        struct ifs_data *ifs,
+        //mip address we want to get the next hop for
+        uint8_t mip_addr,
+        uint8_t TTL
 );
 
 #endif

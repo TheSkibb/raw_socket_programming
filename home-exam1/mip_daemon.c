@@ -17,6 +17,7 @@ int printhelp(){
     exit(EXIT_FAILURE);
 }
 
+//starts the mip daemon
 int mipd(
         struct ifs_data *interfaces,
         int epollfd,
@@ -115,14 +116,18 @@ int mipd(
                 socket_application = -1;
                 continue;
             }
-            
+
             //check mip arp table if this is in the arp table
             int index = arp_t_get_index_from_mip_addr(arp_t, sdu.mip_addr);
             if(index == -1){
-                debugprint("%d, was not in the arp table", sdu.mip_addr);
-                //we dont know what interface and mac address to send the packet to, so we need to run a mip-arp request
-                //the sdu will be sent when the right arp response is received in handle_mip_packet
-                send_mip_arp_request(interfaces, sdu.mip_addr);
+                //different from oblig1 is that we dont need to send arp requests
+                //to learn the MAC address and interface index, we learn this from 
+                //the HELLO messages. Therefore, if a mip address is in the arp table
+                //it means we should forward it.
+                debugprint("%d is not in the arp table, FORWARDing this packet", sdu.mip_addr);
+                send_forward_request(interfaces, sdu.mip_addr, 1);
+                //TODO: add to forward_queue
+                queue_tail_push(forward_queue, (void *)&sdu, 1);
             }else{
                 //we know what interface and mac address is associated with the mip address, so we can send it right away
                 debugprint("%d, was in the arp table", sdu.mip_addr);
@@ -145,6 +150,7 @@ int mipd(
             rc = recv_unix_connection(socket_routing, &router_sdu);
             //if no data was received on connection, the socket was closed on the client side
             if(rc == 0){
+                debugprint("no data received on socket, closing");
                 debugprint("========================================= socket closed=");
                 close(socket_routing);
                 socket_routing = -1;
@@ -158,12 +164,20 @@ int mipd(
                 //send hello mip packet on all interfaces
                 send_mip_route_hello(interfaces);
             }else if(strncmp(router_sdu.payload, "UPD", 3) == 0){
-                debugprint("received UDATE message from router socket");
+                debugprint("received UPDATE message from router socket");
                 //send update packet with routing table to neighbors
                 send_mip_route_update(interfaces, &router_sdu, arp_t);
             }else if(strncmp(router_sdu.payload, "RSP", 3) == 0){
                 //search queue for a packet that is to be sent to the dst mip addr in the request
                 debugprint("received RESPONSE message from router socket");
+                debugprint("should be forwarded to %d", router_sdu.payload[3]);
+                //TODO: get packet from forward_queue and send
+                struct unix_sock_sdu *send;
+                send = (struct unix_sock_sdu*)queue_head_pop(forward_queue);
+                debugprint("we have an sdu for %d waiting", send->mip_addr);
+            }else{
+                debugprint("received message of unknown type");
+                exit(EXIT_FAILURE);
             }
 
             debugprint("======================================router sock handled");

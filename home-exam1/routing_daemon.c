@@ -20,7 +20,9 @@
 #define MAX_NEIGHBOURS 5
 
 //time interval between sending hello/update messages
-#define TIMER_INTERVAL 3
+//#define TIMER_INTERVAL 3
+//TODO: set back to 3
+#define TIMER_INTERVAL 10
 
 //number of hellos to send before sending an update message
 #define NO_UPDATE_COUNT_LIMIT 2
@@ -460,20 +462,38 @@ int handle_forwarding_packet(
         int socket_unix
 ){
     debugprint("=Handling forwarding========================\n");
+    //TODO: change back to -1
+    int found_index = -1;
     for(int i = 0; i < r_t->count; i++){
-        if(r_t->routes[i].dst == sdu->payload[4]){
+
+        if(r_t->routes[i].dst == sdu->payload[3]){
             debugprint("found a matching route");
-            sdu->payload[4] = r_t->routes[i].next_hop;
-            sdu->TTL = sdu->TTL - 1;
+            found_index = i;
             break;
         }
     }
+    if(found_index == -1){
+        printf("cannot forward, unknown destination");
+        exit(EXIT_FAILURE);
+    }
 
-    //send sdu back on unix socket
-    int rc = write(socket_unix, sdu, 0);
+    uint8_t next_hop = r_t->routes[found_index].next_hop;
 
-    if(rc == -1){
-        perror("sendmsg");
+    debugprint("next_hop is %d", next_hop);
+
+    //prepare send sdu
+    struct unix_sock_sdu message;
+    memset(&message, 0, sizeof(message));
+
+    uint8_t msg[] = ROUTING_RESPONSE_MSG; //HEL
+    memcpy(message.payload, msg, sizeof(msg));
+
+    message.mip_addr = sdu->mip_addr;
+    message.TTL = sdu->TTL;
+    message.payload[3] = next_hop;
+
+    if(send(socket_unix, &message, sizeof(message), 0) == -1){
+        perror("send");
         exit(EXIT_FAILURE);
     }
 
@@ -564,14 +584,18 @@ void routing_daemon(
                 );
                 
             }else if(strncmp(recv_sdu.payload, "REQ", 3) == 0){
-                debugprint("forwarding REQUEST for %d");
+                debugprint("forwarding REQUEST\n\t mip_addr: %d, TTL: %d, dst: %d", 
+                        recv_sdu.mip_addr,
+                        recv_sdu.TTL,
+                        recv_sdu.payload[3]);
                 handle_forwarding_packet(
                         &recv_sdu,
                         r_table,
                         socket_unix
                 );
             }else{
-                debugprint("message: %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
+                debugprint("unknown type. message: %s, from %d", recv_sdu.payload, recv_sdu.mip_addr);
+                exit(EXIT_FAILURE);
             }
 
             debugprint("=======================================done=\n");
@@ -580,7 +604,7 @@ void routing_daemon(
 }
 
 int main(int argc, char *argv[]){
-    //set_debug(1); //uncomment to get debug logs
+    set_debug(1); //uncomment to get debug logs
     debugprint("=checking cmd arguments=====================");
     if(argc <= 1){
         printf("too few arguments");
