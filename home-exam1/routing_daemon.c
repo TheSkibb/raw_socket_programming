@@ -14,7 +14,7 @@
 
 //Constants
 
-//amount of neightbors the neighbor list will hold
+//amount of neightbors the neighbour list will hold
 //in this scenario there is 5 nodes, 
 //max number of connections for home-exam topology is 3
 #define MAX_NEIGHBOURS 5
@@ -38,12 +38,12 @@ typedef enum {
 	DISCONNECTED
 } node_state_t;
 
-// Neighbor structure
+// Neighbour structure
 typedef struct {
-	uint8_t mip_addr;        //mip address of neighbor
+	uint8_t mip_addr;        //mip address of neighbour
 	time_t last_hello_time;   // Last time hello was received
 	int missed_hellos;        // Count of missed hellos
-	node_state_t state;       // Current state of this neighbor
+	node_state_t state;       // Current state of this neighbour
 } neighbour_t;
 
 //data structure for storing neighbours
@@ -115,6 +115,17 @@ int routing_table_add_entry(
     r_t->count++;
 
     return i;
+}
+
+int routing_table_get_route_by_dst(struct route_table *r_t, uint8_t dst){
+
+    for(int i = 0; i < r_t->count; i++){
+        if(r_t->routes[i].dst == dst){
+            return i;
+        }
+    }
+
+    return -1;
 }
 
 void print_usage(){
@@ -238,15 +249,7 @@ void poison_reverse(struct route_table *r_table, uint8_t dst){
     }
 }
 
-void reverse_poison_reverse(struct route_table *r_table, uint8_t dst){
-    for(int i = 0; i < r_table->count; i++){
-        if(r_table->routes[i].dst == dst){
-            r_table->routes[i].cost = 1;
-        }
-    }
-}
-
-void check_neighbors(struct neighbour_table *n_table, struct route_table *r_table, int *update_table_changed){
+void check_neighbours(struct neighbour_table *n_table, struct route_table *r_table, int *update_table_changed){
     for(int i = 0; i < n_table->count ; i++){
         neighbour_t curr_neighbour = n_table->neighbours[i];
 
@@ -257,9 +260,8 @@ void check_neighbors(struct neighbour_table *n_table, struct route_table *r_tabl
         long time_diff = time(NULL) - n_table->neighbours[i].last_hello_time;
 
         if(time_diff > DISCONNECTION_TIME_LIMIT){
-            debugprint("neighbor: %d has not said hello in %lo seconds", curr_neighbour.mip_addr, time_diff);
+            debugprint("neighbour: %d has not said hello in %lo seconds", curr_neighbour.mip_addr, time_diff);
             n_table->neighbours[i].state = DISCONNECTED;
-            //TODO: update routing table with infinity for all the 
             poison_reverse(r_table, n_table->neighbours[i].mip_addr);
             *update_table_changed = 0;
         }
@@ -297,8 +299,18 @@ int handle_hello_message(
     //if in list && state == DISCONNECTED -> set state to CONNECTED
     }else if(n_table->neighbours[index].state == DISCONNECTED){
         n_table->neighbours[index].state = CONNECTED;
-        //TODO: set cost back from infinity
-        reverse_poison_reverse(r_table, n_table->neighbours[index].mip_addr);
+        
+        //in our example we know that if a neighbour reconnects, there is already a route to this node
+        int route_index = routing_table_get_route_by_dst(r_table, n_table->neighbours[index].mip_addr);
+        if(route_index == -1){
+            printf("nonexistent route has been reconnected");
+            exit(EXIT_FAILURE);
+        }
+
+        //set route back to using the neighbour to stop possible redirection and poison_reverse infinity cost
+        r_table->routes[route_index].cost = 1;
+        r_table->routes[route_index].next_hop = n_table->neighbours[index].mip_addr;
+
     }
 
     n_table->neighbours[index].last_hello_time = time(NULL);
@@ -362,10 +374,11 @@ int compare_routing_tables(
             uint8_t host_cost = host_routing_table->routes[j].cost;
 
             //uint8_t recv_dst = new_routing_table->routes[i].dst;
-            uint8_t recv_nxt_hop = new_routing_table->routes[i].next_hop;
+            //uint8_t recv_nxt_hop = new_routing_table->routes[i].next_hop;
             uint8_t recv_cost = new_routing_table->routes[i].cost;
-
-            if(host_nxt_hop == recv_nxt_hop && host_cost != recv_cost){
+            
+            //check if a path we already have has an updated cost
+            if(host_nxt_hop == remote_node && host_cost != recv_cost){
                 debugprint("updating routing cost");
                 if(recv_cost != ROUTING_COST_INFINITY){
                     host_routing_table->routes[j].cost = recv_cost + 1;
@@ -374,7 +387,7 @@ int compare_routing_tables(
                 }
             }
             //check if you receive a route which is cheaper (with different next hop)
-            else if(host_cost > recv_cost){
+            else if(host_cost > recv_cost+1){
                 debugprint("received route is cheaper");
                 host_routing_table->routes[j].dst = new_routing_table->routes[i].dst;
                 host_routing_table->routes[j].next_hop = remote_node;
@@ -464,7 +477,7 @@ void routing_daemon(
             //every 5 seconds the routing deamon:
             //  checks for changes in the update table
             //  sends a HELLO or UPDATE message (depending on whether or not update table was changed)
-            //  check the time diff for the neighbor table if some node is DISCONNECTED
+            //  check the time diff for the neighbour table if some node is DISCONNECTED
 
             //read the timer file descriptor to remove the event from epoll
             ssize_t s = read(timerfd, &missed, sizeof(uint64_t));
@@ -477,7 +490,8 @@ void routing_daemon(
             print_neighbour_table(n_table);
             print_routing_table(r_table);
 
-            check_neighbors(n_table, r_table, &update_table_changed);
+            //check if any neighbours have disconnected
+            check_neighbours(n_table, r_table, &update_table_changed);
 
             send_hello_message(socket_unix);
 
