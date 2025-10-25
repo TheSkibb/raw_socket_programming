@@ -29,7 +29,7 @@
 #define DISCONNECTION_TIME_LIMIT 3 * TIMER_INTERVAL 
 #define EPOLL_MAX_EVENTS 10
 
-//Data structures local to only routing_deamon
+//Types and structures local to only routing_deamon
 
 // FSM States
 typedef enum {
@@ -249,7 +249,7 @@ void poison_reverse(struct route_table *r_table, uint8_t dst){
     }
 }
 
-void check_neighbours(struct neighbour_table *n_table, struct route_table *r_table, int *update_table_changed){
+void check_neighbours(struct neighbour_table *n_table, struct route_table *r_table, int *routing_table_changed){
     for(int i = 0; i < n_table->count ; i++){
         neighbour_t curr_neighbour = n_table->neighbours[i];
 
@@ -263,12 +263,15 @@ void check_neighbours(struct neighbour_table *n_table, struct route_table *r_tab
             debugprint("neighbour: %d has not said hello in %lo seconds", curr_neighbour.mip_addr, time_diff);
             n_table->neighbours[i].state = DISCONNECTED;
             poison_reverse(r_table, n_table->neighbours[i].mip_addr);
-            *update_table_changed = 0;
+            *routing_table_changed = 0;
         }
     }   
 }
 
-// 
+// checks if a hello message for different cases:
+// 1: if not in neighbour list -> add to neightbor list in state INIT, add to route_table
+// 2: if in list and state == INIT -> set to CONNECTED
+// 3: if in list && state == DISCONNECTED -> set state to CONNECTED
 int handle_hello_message(
         //this nodes list of neighbours
         struct neighbour_table *n_table,
@@ -277,12 +280,12 @@ int handle_hello_message(
         //hello packet from unix socket
         struct unix_sock_sdu *recv_sdu,
         //pointer to changed_variable to signify if the routing table was changed
-        int *update_table_changed
+        int *routing_table_changed
 ){
     //check neighbour list
     int index = find_neighbour_by_addr(n_table, recv_sdu->mip_addr);
 
-    //if not in neighbour list -> add to neightbor list in state INIT, add to route_table
+    //1.
     if(index == -1){
 
         debugprint("%d was not found in n_table, adding it now", recv_sdu->mip_addr);
@@ -290,13 +293,13 @@ int handle_hello_message(
         routing_table_add_entry(r_table, recv_sdu->mip_addr, recv_sdu->mip_addr, 1);
 
         //this will make the routing daemon send out a update message
-        *update_table_changed = 1;
+        *routing_table_changed = 1;
 
-    //if in list and state == INIT -> set to CONNECTED
+    //2.
     }else if(n_table->neighbours[index].state == INIT){
         n_table->neighbours[index].state = CONNECTED;
 
-    //if in list && state == DISCONNECTED -> set state to CONNECTED
+    //3.
     }else if(n_table->neighbours[index].state == DISCONNECTED){
         n_table->neighbours[index].state = CONNECTED;
         
@@ -311,8 +314,11 @@ int handle_hello_message(
         r_table->routes[route_index].cost = 1;
         r_table->routes[route_index].next_hop = n_table->neighbours[index].mip_addr;
 
+        *routing_table_changed = 1;
+
     }
 
+    //set last hello time to now
     n_table->neighbours[index].last_hello_time = time(NULL);
 
     return 0;
@@ -409,7 +415,7 @@ int handle_update_message(
         struct route_table *r_table,
         //update sdu
         struct unix_sock_sdu *recv_sdu,
-        int *update_table_changed
+        int *routing_table_changed
 ){
     debugprint("RECEIVED A ROUTING TABLE UPDATE FROM %d:", recv_sdu->mip_addr);
 
@@ -465,7 +471,7 @@ void routing_daemon(
         int socket_unix
 ){
     int rc;
-    int update_table_changed = 0;
+    int routing_table_changed = 0;
     int no_new_update_count;
     uint64_t missed;
     while(1){
@@ -491,15 +497,15 @@ void routing_daemon(
             print_routing_table(r_table);
 
             //check if any neighbours have disconnected
-            check_neighbours(n_table, r_table, &update_table_changed);
+            check_neighbours(n_table, r_table, &routing_table_changed);
 
             send_hello_message(socket_unix);
 
             //we send the update messages if there has been any changes to the table
             //or if there hasnt been any update in some amount of hellos
-            if(update_table_changed != 0 || no_new_update_count == NO_UPDATE_COUNT_LIMIT){
+            if(routing_table_changed != 0 || no_new_update_count == NO_UPDATE_COUNT_LIMIT){
                 send_update_messages(socket_unix, r_table, n_table);
-                update_table_changed = 0;
+                routing_table_changed = 0;
                 no_new_update_count = 0;
             }else{
                 no_new_update_count++;
@@ -527,7 +533,7 @@ void routing_daemon(
                         n_table,
                         r_table,
                         &recv_sdu,
-                        &update_table_changed
+                        &routing_table_changed
                 );
             }else if(strncmp(recv_sdu.payload, "UPD", 3) == 0){
                 debugprint("UPDATE message from %d", recv_sdu.mip_addr);
@@ -535,7 +541,7 @@ void routing_daemon(
                         n_table,
                         r_table,
                         &recv_sdu,
-                        &update_table_changed
+                        &routing_table_changed
                 );
                 
             }else if(strncmp(recv_sdu.payload, "REQ", 3) == 0){
